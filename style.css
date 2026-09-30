@@ -807,3 +807,79 @@ button.slot-cell:hover { filter: brightness(1.08); }
 .gian-side .btn-row .btn { font-size: 15px; padding: 6px 12px; }
 .decor-row .btn { flex-direction: column; align-items: flex-start; }
 .decor-row .btn small { color: inherit; opacity: 0.7; font: 600 11px var(--font-body); }
+
+/* ---------- Dải khu phố: con đường với biển chỉ đường ---------- */
+.kp-track { align-items: flex-end; justify-content: space-evenly; padding: 0 28px 4px; }
+.kp-road {
+  position: absolute; left: 14px; right: 14px; bottom: 9px; height: 14px;
+  background: #4A4E57;
+  border: 2px solid var(--ink);
+  border-radius: 8px;
+}
+.kp-road::after {
+  content: ''; position: absolute; left: 8px; right: 8px; top: 50%; height: 2px; transform: translateY(-50%);
+  background: repeating-linear-gradient(90deg, #E8C547 0 16px, transparent 16px 28px);
+}
+.kp { z-index: 1; gap: 0; }
+.kp-sign {
+  display: flex; align-items: center; gap: 5px;
+  background: #1F6F8B; color: var(--paper);
+  border: 2px solid var(--paper);
+  box-shadow: 0 0 0 2px var(--ink), 0 3px 0 2px var(--ink);
+  border-radius: 7px;
+  padding: 4px 12px 2px;
+  font: 800 15px/1 var(--font-display);
+  transition: transform 0.12s;
+}
+.kp-post { width: 4px; height: 7px; background: #8E8A84; border-inline: 1px solid var(--ink); }
+.kp-pin { width: 16px; height: 16px; border-radius: 50%; background: var(--paper); border: 3px solid var(--ink); margin-bottom: 0; }
+.kp:hover .kp-sign { transform: translateY(-2px); }
+.kp.on .kp-sign { background: var(--straw); color: var(--ink); }
+.kp.on .kp-pin { background: var(--chair); box-shadow: 0 0 0 4px rgba(237, 194, 94, 0.55); }
+.kp.locked .kp-sign { background: #6b665e; color: #d9cfbd; border-color: #bdb3a2; }
+.kp.locked .kp-pin { background: #8E8A84; }
+.kp-lock { display: inline-block; width: 9px; height: 7px; background: currentColor; border-radius: 2px; position: relative; margin-top: 3px; }
+.kp-lock::before { content: ''; position: absolute; left: 1px; top: -6px; width: 5px; height: 6px; border: 2px solid currentColor; border-bottom: 0; border-radius: 5px 5px 0 0; }
+
+/* ---------- Góc giải trí ---------- */
+.ctx-col { display: flex; flex-direction: column; gap: 8px; }
+.fun-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+.fun-tabs { display: flex; gap: 6px; }
+.fun-tab { background: var(--paper-2); border: 3px solid var(--ink); border-radius: 12px; padding: 8px 16px 6px; font: 800 18px/1 var(--font-display); }
+.fun-tab.on { background: var(--chair); color: var(--paper); }
+.fun-net { font-size: 14px; }
+.fun-net b { font: 800 17px var(--font-display); }
+.fun-body { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 20px; align-items: center; }
+.fun-side { display: flex; flex-direction: column; gap: 12px; }
+.fun-result { font: 700 18px/1.4 var(--font-display); background: #fff; border: 2px solid var(--ink); border-radius: 12px; padding: 10px 14px; }
+.fun-note { margin-top: 14px; font-size: 12px; color: var(--muted); }
+.wheel-box { position: relative; width: 300px; margin: 0 auto; }
+.wheel-pin { position: absolute; left: 50%; top: -6px; transform: translateX(-50%); width: 0; height: 0; border-left: 16px solid transparent; border-right: 16px solid transparent; border-top: 30px solid var(--chair); z-index: 2; filter: drop-shadow(0 2px 0 var(--ink)); }
+.wheel-svg { width: 300px; height: 300px; display: block; }
+.wheel-txt { font: 800 17px 'Baloo 2', sans-serif; fill: #231a14; }
+.bc-board { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; background: #2E7D4F; border: 4px solid var(--ink); border-radius: 18px; padding: 14px; }
+.bc-cell { position: relative; background: var(--paper); border: 3px solid var(--ink); border-radius: 14px; padding: 12px 6px 8px; display: flex; flex-direction: column; align-items: center; gap: 2px; box-shadow: 0 4px 0 var(--ink); }
+.bc-cell .ic { font-size: 46px; line-height: 1; }
+.bc-cell b { font: 800 18px var(--font-display); }
+.bc-cell .bet { position: absolute; top: -10px; right: -8px; background: var(--straw); border: 2px solid var(--ink); border-radius: 999px; padding: 2px 8px; font: 800 13px var(--font-display); }
+.bc-cell.hit { background: #FFE08A; }
+.bc-cell:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
+.bc-dish { height: 96px; border-radius: 50%; background: radial-gradient(#fff 55%, #d9d2c3); border: 4px solid var(--ink); display: grid; place-items: center; font: 700 15px var(--font-display); color: var(--muted); }
+.bc-dish.shaking { animation: shake 0.15s linear infinite; }
+@keyframes shake { 0% { transform: translate(-4px, 1px) rotate(-3deg); } 50% { transform: translate(4px, -1px) rotate(3deg); } 100% { transform: translate(-4px, 1px) rotate(-3deg); } }
+.bc-dice { display: flex; justify-content: center; gap: 12px; }
+.die { width: 76px; height: 76px; background: #fff; border: 4px solid var(--ink); border-radius: 16px; display: grid; place-items: center; font-size: 44px; box-shadow: 0 4px 0 var(--ink); animation: pop 0.25s ease-out; }
+.chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.chip { width: 58px; height: 58px; border-radius: 50%; border: 4px dashed var(--paper); box-shadow: 0 0 0 3px var(--ink); background: var(--chair); color: var(--paper); font: 800 16px var(--font-display); }
+.chip.on { background: var(--straw); color: var(--ink); border-color: var(--ink); }
+.bk-table { background: #2E7D4F; border: 4px solid var(--ink); border-radius: 18px; padding: 18px; display: flex; flex-direction: column; gap: 22px; }
+.bk-row { display: flex; flex-direction: column; gap: 8px; }
+.bk-who { color: var(--paper); font: 700 16px var(--font-display); }
+.bk-who b { color: var(--straw); }
+.bk-hand { display: flex; gap: 10px; }
+.pcard { width: 74px; height: 104px; background: #fff; border: 3px solid var(--ink); border-radius: 10px; display: flex; flex-direction: column; justify-content: space-between; padding: 6px 8px; box-shadow: 0 4px 0 rgba(0,0,0,.35); animation: pop 0.25s ease-out; }
+.pcard b { font: 800 24px/1 var(--font-display); }
+.pcard i { font-style: normal; font-size: 30px; align-self: flex-end; line-height: 1; }
+.pcard.r { color: #C0392B; }
+.pcard.b { color: #231A14; }
+.pcard.back { background: repeating-linear-gradient(45deg, #1F6F8B 0 8px, #2F5D8A 8px 16px); }

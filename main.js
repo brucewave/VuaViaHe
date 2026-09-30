@@ -3,7 +3,8 @@
 //  Lối chơi theo game Hàng Rong trên Zing Me: gian hàng trong khu phố,
 //  chợ đầu mối, hàng xóm, công an phường, dân anh chị, quán cà phê.
 // ================================================================
-const W = 1280, H = 720;
+let W = 1280;            // bề rộng khung hình, co giãn theo màn hình
+const H = 720, SW = 1280; // SW: bề rộng các cảnh cố định (nhà, chợ, cà phê, hồ câu)
 const GROUND = 420;          // chân tường dãy nhà
 const CURB = 600;            // mép vỉa hè
 const WALK_Y0 = 522, WALK_Y1 = 592;   // dải vỉa hè nhân vật đi được
@@ -968,11 +969,14 @@ function drawPreview(look) {
 // ---------- Thế giới, camera, di chuyển ----------
 // Khu phố dài hơn một màn hình; nhân vật đi tự do trên vỉa hè, camera trượt theo.
 const isStreetView = () => R.view === 'street' || R.view === 'neighbor';
-const worldW = () => (isStreetView() ? STREET_W : W);
+const worldW = () => (isStreetView() ? STREET_W : SW);
+const sceneMargin = () => (isStreetView() ? 0 : (W - SW) / 2);
+const camTarget = () => (isStreetView() ? clamp(R.me.x - W / 2, 0, STREET_W - W) : -sceneMargin());
 function walkBand() {
   if (R.view === 'fish') return { x0: 250, x1: 470, y0: 606, y1: 610 };
-  if (R.view === 'cafe') return { x0: 40, x1: W - 40, y0: 578, y1: 606 };
-  if (R.view === 'home') return { x0: 60, x1: W - 60, y0: WALK_Y0, y1: WALK_Y1 };
+  if (R.view === 'cafe') return { x0: 40, x1: SW - 40, y0: 578, y1: 606 };
+  if (R.view === 'home') return { x0: 60, x1: SW - 60, y0: WALK_Y0, y1: WALK_Y1 };
+  if (R.view === 'market') return { x0: 60, x1: SW - 60, y0: 548, y1: 604 };
   return { x0: 40, x1: STREET_W - 40, y0: WALK_Y0, y1: WALK_Y1 };
 }
 function walkTo(x, y, then) {
@@ -984,7 +988,7 @@ function placeMe(x, y) {
   const b = walkBand(), M = R.me;
   M.x = M.tx = clamp(x, b.x0, b.x1); M.y = M.ty = clamp(y, b.y0, b.y1);
   M.then = null; M.sit = null; M.moving = false;
-  R.cam = clamp(M.x - W / 2, 0, worldW() - W);
+  R.cam = camTarget();
 }
 function enterView(view, opts = {}) {
   R.view = view;
@@ -992,7 +996,8 @@ function enterView(view, opts = {}) {
   R.walkers = []; R.buyers = []; R.visitors = []; R.bikes = [];
   closeModal();
   if (view === 'street' || view === 'neighbor') placeMe(opts.fromRight ? STREET_W - 160 : 170, 560);
-  else if (view === 'home') placeMe(opts.fromRight ? W - 140 : 640, 566);
+  else if (view === 'home') placeMe(opts.fromRight ? SW - 140 : 640, 566);
+  else if (view === 'market') placeMe(640, 590);
   else if (view === 'cafe') placeMe(640, 596);
   else if (view === 'fish') placeMe(420, 606);
   renderDock();
@@ -1019,8 +1024,8 @@ function updateMe(dt) {
     M.moving = false;
     if (M.then) { const f = M.then; M.then = null; f(); }
   }
-  const target = clamp(M.x - W / 2, 0, worldW() - W);
-  R.cam = lerp(R.cam, target, clamp(dt * 6, 0, 1));
+  const target = camTarget();
+  R.cam = isStreetView() ? lerp(R.cam, target, clamp(dt * 6, 0, 1)) : target;
 }
 // đi hết đầu/cuối phố thì sang khu kế bên
 function portalsFor() {
@@ -1042,7 +1047,7 @@ function edgeTravel(side) {
 }
 function updateCrowd(dt) {
   const b = walkBand();
-  const crowd = R.view === 'fish' ? 0 : R.view === 'cafe' ? 0.35 : 0.8;
+  const crowd = R.view === 'fish' ? 0 : R.view === 'cafe' ? 0.35 : R.view === 'market' ? 1 : 0.8;
   if (Math.random() < dt * crowd && R.walkers.length < 9) {
     const dir = Math.random() < 0.5 ? 1 : -1;
     R.walkers.push({ x: dir > 0 ? R.cam - 40 : R.cam + W + 40, y: rand(b.y0 + 4, b.y1), dir, look: makeLook(), speed: rand(55, 95), phase: rand(0, 6), moving: true });
@@ -1073,7 +1078,7 @@ function updateCrowd(dt) {
     else { const s = Math.min(1, (70 * dt) / d); v.x += dx * s; v.y += dy * s; v.dir = Math.sign(dx) || v.dir; v.moving = true; v.phase += dt * 8; }
   }
   R.visitors = R.visitors.filter((v) => v.life > 0 && R.view === 'street');
-  if (R.view !== 'cafe' && Math.random() < dt) {
+  if (R.view !== 'cafe' && R.view !== 'market' && Math.random() < dt) {
     const dir = Math.random() < 0.5 ? 1 : -1;
     R.bikes.push({ x: dir > 0 ? R.cam - 120 : R.cam + W + 120, y: dir > 0 ? 652 : 632, dir, speed: rand(170, 290), color: pick(BIKE_COLORS),
       rider: { skin: pick(['#F1C9A5', '#E0AC80', '#C68B5E']), shirt: pick(SHIRTS), helmet: pick(HELMETS) },
@@ -1081,6 +1086,334 @@ function updateCrowd(dt) {
   }
   for (const q of R.bikes) q.x += q.dir * q.speed * dt;
   R.bikes = R.bikes.filter((q) => q.x > R.cam - 200 && q.x < R.cam + W + 200);
+}
+
+// ---------- Chợ đầu mối: cảnh đi vào được ----------
+const MARKET_STALLS = [
+  { id: 'an',   name: 'Sạp đồ ăn',          owner: 'Dì Năm',  x: 260,  color: '#C0392B', goods: ['kem_chuoi', 'bap', 'banh_mi', 'xoi', 'hot_vit'],
+    look: { skin: '#E0AC80', hair: '#1E1A1A', long: true, hat: 1, shirt: '#8E3B46', pants: '#231A14' } },
+  { id: 'nuoc', name: 'Sạp nước giải khát', owner: 'Chú Sáu', x: 510,  color: '#1F6F8B', goods: ['tra_da', 'nuoc_mia'],
+    look: { skin: '#C68B5E', hair: '#2B211C', long: false, hat: 3, capColor: '#1F6F8B', shirt: '#F2F2EE', style: 'tank', pants: '#3D405B' } },
+  { id: 'keo',  name: 'Sạp kẹo, đồ chơi',   owner: 'Cô Út',   x: 760,  color: '#D98E04', goods: ['keo_bong', 'do_choi'],
+    look: { skin: '#F1C9A5', hair: '#3B2A20', long: true, hat: 0, shirt: '#F7B32B', style: 'flower', pants: '#264653' } },
+  { id: 'ao',   name: 'Sạp quần áo',        owner: 'Bà Tám',  x: 1010, color: '#7A3E9D', goods: ['non', 'ao_thun', 'giay', 'kinh', 'tui'],
+    look: { skin: '#E0AC80', hair: '#DDD', long: true, hat: 0, shirt: '#7A3E9D', pants: '#231A14', acc: 'glasses' } },
+];
+const MARKET_BOSS = { name: 'Ông Chủ Mối', x: 1180, look: { skin: '#C68B5E', hair: '#1E1A1A', long: false, hat: 0, shirt: '#E9EEF5', style: 'collar', pants: '#3A3A40', acc: 'book' } };
+const MK_Y = 500;
+function drawMarketBg(g, rnd, lights, PM) {
+  // mái tôn, kèo thép
+  g.fillStyle = '#5B6570'; g.fillRect(-PM, 0, SW + 2 * PM, 120);
+  g.strokeStyle = 'rgba(255,255,255,.08)'; g.lineWidth = 2;
+  for (let x = -PM; x < SW + PM; x += 18) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, 120); g.stroke(); }
+  g.fillStyle = '#CFC2A8'; g.fillRect(-PM, 120, SW + 2 * PM, GROUND - 120);
+  g.strokeStyle = '#3E4448'; g.lineWidth = 6;
+  for (let x = -PM - 80; x < SW + PM; x += 320) {
+    g.beginPath(); g.moveTo(x, 120); g.lineTo(x + 160, 40); g.lineTo(x + 320, 120); g.stroke();
+    g.beginPath(); g.moveTo(x + 160, 40); g.lineTo(x + 160, 120); g.moveTo(x + 80, 80); g.lineTo(x + 160, 120); g.moveTo(x + 240, 80); g.lineTo(x + 160, 120); g.stroke();
+  }
+  g.fillStyle = '#3E4448'; g.fillRect(-PM, 116, SW + 2 * PM, 10);
+  // bảng tên chợ
+  g.fillStyle = '#C0392B'; rr(g, 380, 140, 520, 56, 10); g.fill(); g.strokeStyle = '#231A14'; g.lineWidth = 3; g.stroke();
+  signText(g, 'CHỢ ĐẦU MỐI · BÁN SỈ', 640, 168, 34, '#FFE08A', 480);
+  // đèn treo
+  for (let x = 120; x < SW; x += 200) {
+    g.strokeStyle = '#231A14'; g.lineWidth = 2; g.beginPath(); g.moveTo(x, 126); g.lineTo(x, 214); g.stroke();
+    g.fillStyle = '#FFE08A'; g.beginPath(); g.arc(x, 222, 9, 0, 7); g.fill();
+    g.fillStyle = '#3E4448'; g.beginPath(); g.moveTo(x - 18, 216); g.lineTo(x + 18, 216); g.lineTo(x + 8, 206); g.lineTo(x - 8, 206); g.closePath(); g.fill();
+    lights.push({ x: x - 40, y: 212, w: 80, h: 40, on: true, warm: true });
+  }
+  // thùng, bao, sọt dọc tường
+  for (let x = -PM; x < SW + PM; x += 70) {
+    const k = Math.floor(rnd() * 3);
+    g.fillStyle = ['#B07A3A', '#C9A06A', '#E6D3A3'][k];
+    if (k === 2) { g.beginPath(); g.ellipse(x + 30, GROUND - 26, 26, 28, 0, 0, 7); g.fill(); g.strokeStyle = 'rgba(0,0,0,.2)'; g.beginPath(); g.moveTo(x + 18, GROUND - 50); g.lineTo(x + 42, GROUND - 50); g.stroke(); }
+    else { g.fillRect(x + 6, GROUND - 48, 52, 48); g.strokeStyle = 'rgba(0,0,0,.25)'; g.lineWidth = 1.5; g.strokeRect(x + 6, GROUND - 48, 52, 48); g.beginPath(); g.moveTo(x + 6, GROUND - 24); g.lineTo(x + 58, GROUND - 24); g.stroke(); }
+  }
+  // các sạp: bạt che, kệ sau lưng
+  for (const m of MARKET_STALLS) {
+    const x = m.x;
+    g.fillStyle = '#6B4F3A'; g.fillRect(x - 104, 250, 6, 250); g.fillRect(x + 98, 250, 6, 250);
+    g.fillStyle = m.color; g.beginPath(); g.moveTo(x - 120, 250); g.lineTo(x + 120, 250); g.lineTo(x + 130, 290); g.lineTo(x - 130, 290); g.closePath(); g.fill();
+    g.strokeStyle = '#231A14'; g.lineWidth = 2.5; g.stroke();
+    g.fillStyle = 'rgba(255,255,255,.3)'; for (let k = x - 118; k < x + 110; k += 34) { g.beginPath(); g.moveTo(k, 250); g.lineTo(k + 17, 250); g.lineTo(k + 20, 290); g.lineTo(k + 3, 290); g.fill(); }
+    g.fillStyle = '#FFF4D6'; rr(g, x - 92, 296, 184, 30, 6); g.fill(); g.strokeStyle = '#231A14'; g.stroke();
+    signText(g, m.name.toUpperCase(), x, 311, 16, m.color, 170);
+    g.fillStyle = '#8C6A4A'; g.fillRect(x - 96, 340, 192, 8); g.fillRect(x - 96, 380, 192, 8);
+    m.goods.forEach((id, k) => { emoji(g, GOODS[id].icon, x - 70 + (k % 5) * 35, 328 + (k % 2) * 40, 22); emoji(g, GOODS[id].icon, x - 52 + (k % 5) * 35, 370 - (k % 2) * 40, 18); });
+  }
+  // bàn chủ mối
+  const bx = MARKET_BOSS.x;
+  g.fillStyle = '#3B2E2A'; rr(g, bx - 70, 300, 140, 110, 8); g.fill();
+  g.fillStyle = '#FFF4D6'; rr(g, bx - 62, 268, 124, 30, 6); g.fill(); g.strokeStyle = '#231A14'; g.lineWidth = 2; g.stroke();
+  signText(g, 'SỔ NỢ · CHỦ MỐI', bx, 283, 14, '#C0392B', 116);
+}
+function drawMarketFloor(g, BW) {
+  g.fillStyle = '#B9B2A5'; g.fillRect(0, GROUND, BW, H - GROUND);
+  g.fillStyle = 'rgba(0,0,0,.08)'; for (let x = 0; x < BW; x += 160) g.fillRect(x, GROUND, 2, H - GROUND);
+  g.fillStyle = 'rgba(0,0,0,.2)'; g.fillRect(0, GROUND, BW, 8);
+  g.fillStyle = 'rgba(90,120,140,.18)'; for (let i = 0; i < 12; i++) { g.beginPath(); g.ellipse(Math.random() * BW, 560 + Math.random() * 120, 40 + Math.random() * 40, 8, 0, 0, 7); g.fill(); }
+}
+function marketObjects(hits, layer) {
+  // bảng giá phấn
+  const cheap = (id) => S.prices[id] < (S.prevPrices[id] || S.prices[id]) * 0.97;
+  ctx.fillStyle = '#2E4034'; rr(ctx, 20, 230, 110, 150, 8); ctx.fill(); ctx.strokeStyle = '#8C6A4A'; ctx.lineWidth = 6; ctx.stroke();
+  ctx.fillStyle = '#F2F2EE'; ctx.font = '800 14px "Baloo 2", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('GIÁ SỈ HÔM NAY', 75, 248);
+  ctx.font = '600 12px "Be Vietnam Pro", sans-serif'; ctx.textAlign = 'left';
+  GOOD_IDS.filter((id) => GOODS[id].lvl <= S.level).slice(0, 7).forEach((id, k) => { ctx.fillStyle = cheap(id) ? '#9CE07A' : '#F2F2EE'; ctx.fillText(`${GOODS[id].name.slice(0, 9)} ${fmtK(S.prices[id])}`, 28, 268 + k * 16); });
+  ctx.strokeStyle = '#6B4F3A'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(50, 380); ctx.lineTo(44, 470); ctx.moveTo(100, 380); ctx.lineTo(106, 470); ctx.stroke();
+  hits.push({ x: 10, y: 220, w: 130, h: 260, kind: 'board', pri: 2 });
+  for (const m of MARKET_STALLS) {
+    const x = m.x;
+    layer.push({ y: MK_Y - 2, draw: () => drawPerson(ctx, { x: x + 20, y: MK_Y - 16, dir: -1, look: { scale: 1.1, ...m.look }, moving: false, phase: 0 }) });
+    layer.push({ y: MK_Y, draw: () => {
+      ctx.fillStyle = '#8C6A4A'; ctx.fillRect(x - 110, MK_Y - 64, 220, 16); ctx.strokeStyle = '#231A14'; ctx.lineWidth = 2; ctx.strokeRect(x - 110, MK_Y - 64, 220, 16);
+      ctx.fillStyle = shade(m.color, -20); ctx.fillRect(x - 110, MK_Y - 48, 220, 48);
+      ctx.fillStyle = '#6B4F3A'; ctx.fillRect(x - 104, MK_Y - 48, 8, 48); ctx.fillRect(x + 96, MK_Y - 48, 8, 48);
+      m.goods.slice(0, 5).forEach((id, k) => {
+        const gx2 = x - 84 + k * 42;
+        ctx.fillStyle = '#B07A3A'; ctx.fillRect(gx2 - 16, MK_Y - 86, 32, 22);
+        emoji(ctx, GOODS[id].icon, gx2, MK_Y - 90, 22);
+        if (GOODS[id].lvl > S.level) { ctx.fillStyle = 'rgba(35,26,20,.55)'; ctx.fillRect(gx2 - 16, MK_Y - 104, 32, 40); }
+      });
+      nameTag(ctx, m.owner, x, MK_Y - 262, false, m.goods.some(cheap) ? 'Có món rẻ hôm nay!' : 'Mối hàng sỉ');
+    } });
+    if (m.goods.some((id) => cheap(id) && GOODS[id].lvl <= S.level)) exclaim(x + 92, MK_Y - 272);
+    hits.push({ x: x - 120, y: 240, w: 240, h: MK_Y - 240 + 10, kind: 'mstall', id: m.id, pri: 2 });
+  }
+  const b = MARKET_BOSS;
+  layer.push({ y: 470, draw: () => {
+    drawPerson(ctx, { x: b.x, y: 452, dir: -1, look: { scale: 1.1, ...b.look }, moving: false, phase: 0 });
+    ctx.fillStyle = '#6B4F3A'; ctx.fillRect(b.x - 80, 430, 160, 60); ctx.strokeStyle = '#231A14'; ctx.lineWidth = 2; ctx.strokeRect(b.x - 80, 430, 160, 60);
+    ctx.fillStyle = '#FFF4D6'; ctx.fillRect(b.x - 30, 424, 50, 8);
+    nameTag(ctx, b.name, b.x, 250, false, S.debt ? 'Đang nợ ' + fmtK(S.debt) : 'Cho mua chịu');
+  } });
+  hits.push({ x: b.x - 90, y: 240, w: 180, h: 250, kind: 'boss', pri: 2 });
+}
+function openMarketStall(id) {
+  const m = MARKET_STALLS.find((q) => q.id === id);
+  openModal(`${m.name} · ${m.owner}`, marketHTML(id), { kind: 'market', arg: id });
+}
+function debtHTML() {
+  return `<p class="event-text">Ông Chủ Mối cho mua chịu tới <b>${fmt(creditLimit())}</b>. Nợ tính lãi 5% mỗi 5 phút, vượt 130% hạn mức là bị siết nợ. Trí tuệ cao thì được nợ nhiều hơn.</p>
+    <div class="stats-line"><span>Đang nợ: <b class="${S.debt ? 'neg' : ''}">${fmt(S.debt)}</b></span><span>Tiền mặt: <b>${fmt(S.money)}</b></span></div>
+    <div class="btn-row"><button class="btn" data-act="repay" ${S.debt && S.money ? '' : 'disabled'}>Trả nợ</button><button class="btn ${R.credit ? 'red' : 'paper'}" data-act="credit">${R.credit ? 'Đang bật mua chịu' : 'Bật mua chịu'}</button></div>`;
+}
+
+// ---------- Góc giải trí ở quán cà phê: vòng quay, bầu cua, bài cào ----------
+// Chỉ dùng tiền trong game. Mỗi lần chơi đều ghi vào S.fun để xem lời lỗ.
+const WHEEL = [
+  { label: '2k', money: 2000, color: '#F7C948', w: 22 },
+  { label: 'Trượt', color: '#B8B2A6', w: 18 },
+  { label: '10k', money: 10000, color: '#6BA368', w: 14 },
+  { label: '+5 sức', energy: 5, color: '#3E8FD9', w: 10 },
+  { label: '5k', money: 5000, color: '#EE8434', w: 18 },
+  { label: '3 mồi', bait: 3, color: '#8E6FB5', w: 7 },
+  { label: '50k', money: 50000, color: '#D7372B', w: 2 },
+  { label: 'Trượt', color: '#B8B2A6', w: 18 },
+];
+const SPIN_COOLDOWN = 10 * 60 * 1000, SPIN_PRICE = 5000;
+const BAUCUA = [['bau', 'Bầu', '🍐'], ['cua', 'Cua', '🦀'], ['tom', 'Tôm', '🦐'], ['ca', 'Cá', '🐟'], ['ga', 'Gà', '🐓'], ['nai', 'Nai', '🦌']];
+const CHIPS = [1000, 5000, 10000, 50000];
+const SUITS = [['♠', 'b'], ['♣', 'b'], ['♥', 'r'], ['♦', 'r']];
+const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+const funState = () => (S.fun ||= { spinAt: 0, net: 0, played: 0 });
+function funRecord(delta) { const F = funState(); F.net += delta; F.played++; }
+
+function funHTML() {
+  const tab = R.funTab || 'wheel';
+  const F = funState();
+  const tabs = [['wheel', 'Vòng quay'], ['baucua', 'Bầu cua'], ['baicao', 'Bài cào']]
+    .map(([k, n]) => `<button class="fun-tab${tab === k ? ' on' : ''}" data-funtab="${k}">${n}</button>`).join('');
+  const body = tab === 'wheel' ? wheelHTML() : tab === 'baucua' ? baucuaHTML() : baicaoHTML();
+  return `<div class="fun-head"><div class="fun-tabs">${tabs}</div>
+    <span class="fun-net">Tiền: <b>${fmt(S.money)}</b> · Lời lỗ ở đây: <b class="${F.net >= 0 ? 'pos' : 'neg'}">${F.net >= 0 ? '+' : '−'}${fmt(Math.abs(F.net))}</b></span></div>
+    ${body}<p class="fun-note">Chơi cho vui bằng tiền trong game. Chơi hoài dễ cháy túi nha!</p>`;
+}
+// Vòng quay
+function wheelSVG() {
+  const n = WHEEL.length, R0 = 130, c = 140;
+  const seg = WHEEL.map((s, i) => {
+    const a0 = (i / n) * Math.PI * 2 - Math.PI / 2, a1 = ((i + 1) / n) * Math.PI * 2 - Math.PI / 2;
+    const x0 = c + R0 * Math.cos(a0), y0 = c + R0 * Math.sin(a0), x1 = c + R0 * Math.cos(a1), y1 = c + R0 * Math.sin(a1);
+    const am = (a0 + a1) / 2, tx = c + R0 * 0.64 * Math.cos(am), ty = c + R0 * 0.64 * Math.sin(am);
+    const rot = (am * 180) / Math.PI + 90;
+    return `<path d="M${c} ${c} L${x0.toFixed(1)} ${y0.toFixed(1)} A${R0} ${R0} 0 0 1 ${x1.toFixed(1)} ${y1.toFixed(1)} Z" fill="${s.color}" stroke="#231a14" stroke-width="3"/>
+      <text x="${tx.toFixed(1)}" y="${ty.toFixed(1)}" transform="rotate(${rot.toFixed(1)} ${tx.toFixed(1)} ${ty.toFixed(1)})" text-anchor="middle" dominant-baseline="middle" class="wheel-txt">${s.label}</text>`;
+  }).join('');
+  return `<svg viewBox="0 0 280 280" class="wheel-svg" aria-label="Vòng quay may mắn"><g id="wheel-g" style="transform-origin:140px 140px;transform:rotate(${R.wheelDeg || 0}deg)">${seg}
+    <circle cx="140" cy="140" r="26" fill="#fff4d6" stroke="#231a14" stroke-width="4"/></g>
+</svg>`;
+}
+function wheelHTML() {
+  const F = funState();
+  const free = now() - F.spinAt >= SPIN_COOLDOWN;
+  const wait = Math.ceil((SPIN_COOLDOWN - (now() - F.spinAt)) / 60000);
+  return `<div class="fun-body wheel-body">
+    <div class="wheel-box"><div class="wheel-pin" aria-hidden="true"></div>${wheelSVG()}</div>
+    <div class="fun-side">
+      <p class="event-text">Quay trúng tiền, sức hay mồi câu. Mỗi 10 phút được <b>quay miễn phí</b> một lần, còn lại ${fmt(SPIN_PRICE)} một lượt.</p>
+      <button class="btn big" data-fun="spin" ${R.spinning ? 'disabled' : ''}>${R.spinning ? 'Đang quay…' : free ? 'Quay miễn phí' : `Quay · ${fmt(SPIN_PRICE)}`}</button>
+      ${free ? '' : `<small>Lượt miễn phí tiếp theo sau ${wait} phút.</small>`}
+      ${R.wheelMsg ? `<p class="fun-result">${R.wheelMsg}</p>` : ''}
+    </div></div>`;
+}
+function spinWheel() {
+  if (R.spinning) return;
+  const F = funState();
+  const free = now() - F.spinAt >= SPIN_COOLDOWN;
+  if (!free) { if (S.money < SPIN_PRICE) { toast('Không đủ tiền quay.', 'bad'); return; } S.money -= SPIN_PRICE; funRecord(-SPIN_PRICE); }
+  else F.spinAt = now();
+  const total = WHEEL.reduce((a, s) => a + s.w, 0);
+  let r = Math.random() * total, idx = 0;
+  for (let i = 0; i < WHEEL.length; i++) { if ((r -= WHEEL[i].w) <= 0) { idx = i; break; } }
+  const seg = 360 / WHEEL.length;
+  const base = Math.ceil((R.wheelDeg || 0) / 360) * 360 + 360 * 5;
+  R.wheelDeg = base - (idx * seg + seg / 2) + rand(-seg * 0.3, seg * 0.3);
+  R.spinning = true; R.wheelMsg = '';
+  refreshModal();
+  const g = $('wheel-g');
+  if (g) { g.style.transition = 'none'; g.style.transform = `rotate(${(R.wheelDeg - 360 * 5) % 360}deg)`; void g.getBoundingClientRect(); g.style.transition = 'transform 3.4s cubic-bezier(.17,.67,.21,1)'; g.style.transform = `rotate(${R.wheelDeg}deg)`; }
+  for (let i = 0; i < 10; i++) Snd.tone(600 + i * 40, 0.04, 'square', 0.03, i * 0.3);
+  setTimeout(() => {
+    R.spinning = false;
+    const s = WHEEL[idx];
+    if (s.money) { S.money += s.money; funRecord(s.money); R.wheelMsg = `Trúng <b>${fmt(s.money)}</b>!`; Snd.coin(); }
+    else if (s.energy) { S.energy = Math.min(energyMax(), S.energy + s.energy); R.wheelMsg = 'Trúng <b>+5 sức</b>!'; Snd.coin(); }
+    else if (s.bait) { S.fishing.bait.dacbiet = (S.fishing.bait.dacbiet || 0) + 3; R.wheelMsg = 'Trúng <b>3 mồi bí truyền</b>, ra hồ câu cá hiếm đi!'; Snd.coin(); }
+    else { R.wheelMsg = 'Trượt rồi, lần sau may hơn!'; Snd.bad(); }
+    if (R.modal === 'fun') refreshModal();
+  }, 3500);
+}
+// Bầu cua: đặt cược lên 1 hay nhiều con, lắc 3 hột; mỗi hột trùng ăn 1 lần tiền cược
+function bcState() { return (R.bc ||= { chip: 5000, bets: {}, dice: null, rolling: false, msg: '' }); }
+function baucuaHTML() {
+  const B = bcState();
+  const total = Object.values(B.bets).reduce((a, b) => a + b, 0);
+  const dice = B.rolling ? '<div class="bc-dish shaking">Đang lắc…</div>'
+    : B.dice ? `<div class="bc-dice">${B.dice.map((d) => `<span class="die">${BAUCUA.find((x) => x[0] === d)[2]}</span>`).join('')}</div>`
+    : '<div class="bc-dish">Đặt cược rồi bấm Lắc</div>';
+  return `<div class="fun-body bc-body">
+    <div class="bc-board">${BAUCUA.map(([id, n, ic]) => `<button class="bc-cell${B.dice && B.dice.includes(id) ? ' hit' : ''}" data-bet="${id}" ${B.rolling ? 'disabled' : ''}><span class="ic">${ic}</span><b>${n}</b>${B.bets[id] ? `<span class="bet">${fmtK(B.bets[id])}</span>` : ''}</button>`).join('')}</div>
+    <div class="fun-side">
+      ${dice}
+      <div class="chips">${CHIPS.map((c) => `<button class="chip${B.chip === c ? ' on' : ''}" data-chip="${c}">${fmtK(c)}</button>`).join('')}</div>
+      <div class="kv"><span>Tổng cược</span><b>${fmt(total)}</b></div>
+      <div class="btn-row"><button class="btn big" data-fun="roll" ${B.rolling || !total ? 'disabled' : ''}>Lắc!</button><button class="btn paper" data-fun="clearbet" ${B.rolling || !total ? 'disabled' : ''}>Xóa cược</button></div>
+      ${B.msg ? `<p class="fun-result">${B.msg}</p>` : ''}
+    </div></div>`;
+}
+function bcBet(id) {
+  const B = bcState();
+  if (B.rolling) return;
+  const total = Object.values(B.bets).reduce((a, b) => a + b, 0);
+  if (total + B.chip > S.money) { toast('Không đủ tiền đặt thêm.', 'bad'); return; }
+  if (B.dice) { B.dice = null; B.msg = ''; }
+  B.bets[id] = (B.bets[id] || 0) + B.chip;
+  Snd.click();
+}
+function bcRoll() {
+  const B = bcState();
+  const total = Object.values(B.bets).reduce((a, b) => a + b, 0);
+  if (!total || B.rolling || total > S.money) return;
+  S.money -= total;
+  B.rolling = true; B.msg = ''; B.dice = null;
+  refreshModal();
+  for (let i = 0; i < 8; i++) Snd.tone(300 + Math.random() * 200, 0.05, 'triangle', 0.04, i * 0.12);
+  setTimeout(() => {
+    B.rolling = false;
+    B.dice = [0, 1, 2].map(() => pick(BAUCUA)[0]);
+    let back = 0;
+    for (const [id, amt] of Object.entries(B.bets)) { const m = B.dice.filter((d) => d === id).length; if (m) back += amt + amt * m; }
+    S.money += back;
+    funRecord(back - total);
+    B.msg = back > total ? `Ăn <b>${fmt(back - total)}</b>!` : back === total ? 'Huề vốn.' : `Thua <b>${fmt(total - back)}</b>.`;
+    back > total ? Snd.coin() : Snd.bad();
+    B.bets = {};
+    if (R.modal === 'fun') refreshModal();
+  }, 1300);
+}
+// Bài cào: 3 lá, điểm = tổng % 10 (J Q K và 10 tính 0); ba lá J/Q/K là "ba tây", ăn gấp đôi
+function bkState() { return (R.bk ||= { chip: 5000, me: null, dealer: null, reveal: false, msg: '' }); }
+const cardVal = (c) => { const i = RANKS.indexOf(c.r); return i >= 9 ? 0 : i + 1; };
+const isTay = (h) => h.every((c) => ['J', 'Q', 'K'].includes(c.r));
+const handScore = (h) => (isTay(h) ? 10 : h.reduce((a, c) => a + cardVal(c), 0) % 10);
+function cardHTML(c, hidden) {
+  if (hidden) return '<span class="pcard back"></span>';
+  return `<span class="pcard ${c.col}"><b>${c.r}</b><i>${c.s}</i></span>`;
+}
+function baicaoHTML() {
+  const K = bkState();
+  const hand = (h, hide) => (h ? h.map((c) => cardHTML(c, hide)).join('') : '<span class="pcard back"></span>'.repeat(3));
+  const label = (h) => (h ? (isTay(h) ? 'Ba tây!' : `${handScore(h)} nút`) : '');
+  return `<div class="fun-body bk-body">
+    <div class="bk-table">
+      <div class="bk-row"><span class="bk-who">Nhà cái ${K.reveal ? `· <b>${label(K.dealer)}</b>` : ''}</span><div class="bk-hand">${hand(K.dealer, !K.reveal)}</div></div>
+      <div class="bk-row"><span class="bk-who">${esc(S.player.name)} ${K.me ? `· <b>${label(K.me)}</b>` : ''}</span><div class="bk-hand">${hand(K.me, false)}</div></div>
+    </div>
+    <div class="fun-side">
+      <p class="event-text">Mỗi người 3 lá, cộng điểm lấy hàng đơn vị. 10, J, Q, K tính 0 nút. Ba lá hình (J Q K) là <b>ba tây</b>, ăn gấp đôi.</p>
+      <div class="chips">${CHIPS.map((c) => `<button class="chip${K.chip === c ? ' on' : ''}" data-bkchip="${c}">${fmtK(c)}</button>`).join('')}</div>
+      <button class="btn big" data-fun="deal" ${K.me && !K.reveal ? 'disabled' : ''}>Chia bài · cược ${fmt(K.chip)}</button>
+      ${K.msg ? `<p class="fun-result">${K.msg}</p>` : ''}
+    </div></div>`;
+}
+function bkDeal() {
+  const K = bkState();
+  if (K.me && !K.reveal) return;
+  if (S.money < K.chip) { toast('Không đủ tiền cược.', 'bad'); return; }
+  S.money -= K.chip;
+  const deck = [];
+  for (const [s, col] of SUITS) for (const r of RANKS) deck.push({ r, s, col });
+  for (let i = deck.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [deck[i], deck[j]] = [deck[j], deck[i]]; }
+  K.me = deck.slice(0, 3); K.dealer = deck.slice(3, 6); K.reveal = false; K.msg = '';
+  Snd.click();
+  refreshModal();
+  setTimeout(() => {
+    K.reveal = true;
+    const a = handScore(K.me), b = handScore(K.dealer);
+    let back = 0;
+    if (a > b) back = K.chip * (isTay(K.me) ? 3 : 2);
+    else if (a === b) back = K.chip;
+    S.money += back;
+    funRecord(back - K.chip);
+    K.msg = a > b ? `Thắng <b>${fmt(back - K.chip)}</b>!${isTay(K.me) ? ' Ba tây ăn đậm!' : ''}` : a === b ? 'Bằng nút, huề.' : `Nhà cái ăn ${fmt(K.chip)}.`;
+    a > b ? Snd.coin() : a === b ? Snd.click() : Snd.bad();
+    if (R.modal === 'fun') refreshModal();
+  }, 1100);
+}
+function openFun() { openModal('Góc giải trí', funHTML(), { kind: 'fun' }); }
+function onFunClick(d) {
+  if (d.funtab) { R.funTab = d.funtab; Snd.click(); }
+  else if (d.fun === 'spin') { spinWheel(); return; }
+  else if (d.fun === 'roll') { bcRoll(); return; }
+  else if (d.fun === 'clearbet') { bcState().bets = {}; }
+  else if (d.fun === 'deal') { bkDeal(); return; }
+  else if (d.bet) bcBet(d.bet);
+  else if (d.chip) { bcState().chip = Number(d.chip); Snd.click(); }
+  else if (d.bkchip) { bkState().chip = Number(d.bkchip); Snd.click(); }
+  refreshModal();
+}
+// góc giải trí vẽ trong quán cà phê (bên trái)
+function drawFunCorner(hits, layer) {
+  const x = 110;
+  layer.push({ y: 560, draw: () => {
+    ctx.fillStyle = '#6B3E26'; ctx.fillRect(x - 60, 520, 120, 10); ctx.fillRect(x - 50, 530, 8, 40); ctx.fillRect(x + 42, 530, 8, 40);
+    ctx.fillStyle = '#2E7D4F'; ctx.fillRect(x - 56, 512, 112, 10);
+    const t = R.t * 1.5;
+    ctx.save(); ctx.translate(x, 452); ctx.rotate(t);
+    const cols = ['#F7C948', '#D7372B', '#6BA368', '#3E8FD9', '#EE8434', '#8E6FB5'];
+    for (let k = 0; k < 6; k++) { ctx.fillStyle = cols[k]; ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, 34, (k * Math.PI) / 3, ((k + 1) * Math.PI) / 3); ctx.closePath(); ctx.fill(); }
+    ctx.restore();
+    ctx.strokeStyle = '#231A14'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(x, 452, 34, 0, 7); ctx.stroke();
+    ctx.fillStyle = '#6E6A64'; ctx.fillRect(x - 3, 486, 6, 28);
+    ctx.fillStyle = '#D7372B'; ctx.beginPath(); ctx.moveTo(x, 424); ctx.lineTo(x - 7, 410); ctx.lineTo(x + 7, 410); ctx.closePath(); ctx.fill();
+    emoji(ctx, '🎲', x - 34, 504, 18); emoji(ctx, '🃏', x + 34, 504, 18);
+    ctx.fillStyle = '#FFF4D6'; rr(ctx, x - 62, 372, 124, 26, 6); ctx.fill(); ctx.strokeStyle = '#231A14'; ctx.lineWidth = 2; ctx.stroke();
+    signText(ctx, 'GÓC GIẢI TRÍ', x, 385, 15, '#C0392B');
+  } });
+  exclaim(x + 58, 380);
+  hits.push({ x: x - 70, y: 366, w: 140, h: 210, kind: 'fun', pri: 2 });
 }
 
 // ---------- Nhà riêng ----------
@@ -1198,7 +1531,7 @@ function closeModal() {
   $('modal').hidden = true;
   R.modal = null; R.modalArg = null;
 }
-const MODAL_HTML = { market: () => marketHTML(), kho: () => khoHTML(), gian: () => gianHTML(...R.modalArg), neighbors: () => neighborsHTML(),
+const MODAL_HTML = { market: () => marketHTML(R.modalArg), debt: () => debtHTML(), fun: () => funHTML(), kho: () => khoHTML(), gian: () => gianHTML(...R.modalArg), neighbors: () => neighborsHTML(),
   fashion: () => fashionHTML(), news: () => newsHTML(), cafe: () => cafeHTML(), street2: () => street2HTML(),
   fishshop: () => fishShopHTML(), basket: () => basketHTML(), book: () => bookHTML(), profile: () => profileHTML(R.modalArg), char: () => charHTML() };
 function refreshModal() {
@@ -1216,9 +1549,10 @@ function trendMark(id) {
   const p = S.prices[id], prev = S.prevPrices[id] || p;
   return p > prev * 1.03 ? '<span class="up" title="Tăng so với đợt trước">▲</span>' : p < prev * 0.97 ? '<span class="down" title="Rẻ hơn đợt trước">▼</span>' : '<span class="flat">•</span>';
 }
-function marketHTML() {
+function marketHTML(cat) {
+  const only = cat ? MARKET_STALLS.find((m) => m.id === cat)?.goods : null;
   const mins = Math.max(0, Math.ceil((600000 - (now() - S.pricesAt)) / 60000));
-  const rows = GOOD_IDS.map((id) => {
+  const rows = GOOD_IDS.filter((id) => !only || only.includes(id)).map((id) => {
     const g = GOODS[id], locked = g.lvl > S.level;
     const perMin = Math.round(60 / g.t * (g.sell - g.buy));
     const btns = locked ? `<span class="lock">Cấp ${g.lvl}</span>`
@@ -1392,7 +1726,8 @@ $('modal-body').addEventListener('click', (e) => {
   const t = e.target.closest('button');
   if (!t || t.disabled) return;
   const d = t.dataset;
-  const [si, i] = R.modalArg || [];
+  if (R.modal === 'fun') return onFunClick(d);
+  const [si, i] = Array.isArray(R.modalArg) ? R.modalArg : [];
   if (d.buy) return buy(d.buy, d.n);
   if (d.visit) return visitNeighbor(d.visit);
   if (d.thug) return resolveThug(d.thug);
@@ -1442,10 +1777,10 @@ function renderDock() {
   const cur = R.view === 'street' ? 'kp' + S.cur : R.view;
   const kps = [0, 1].map((k) => {
     const locked = k >= S.streets.length;
-    return `<button class="kp${cur === 'kp' + k ? ' on' : ''}${locked ? ' locked' : ''}" data-go="kp${k}" title="${locked ? `Khu phố ${k + 1}: chưa mua` : `Khu phố ${k + 1}`}"><span class="kp-flag">KP ${k + 1}</span><span class="kp-dot"></span></button>`;
+    return `<button class="kp${cur === 'kp' + k ? ' on' : ''}${locked ? ' locked' : ''}" data-go="kp${k}" title="${locked ? `Khu phố ${k + 1}: chưa mua` : `Khu phố ${k + 1}`}"><span class="kp-sign">${locked ? '<i class="kp-lock" aria-hidden="true"></i>' : ''}KP ${k + 1}</span><span class="kp-post"></span><span class="kp-pin"></span></button>`;
   }).join('');
   const ic = (go, icon, label) => `<button class="nav-ic${cur === go ? ' on' : ''}" data-go="${go}"><span class="ni" aria-hidden="true">${icon}</span><span class="nl">${label}</span></button>`;
-  $('dock').innerHTML = `${ic('home', '🏠', 'Nhà riêng')}<div class="kp-track"><span class="kp-line"></span>${kps}</div>${ic('market', '🛒', 'Chợ')}${ic('cafe', '☕', 'Cà phê')}${ic('fish', '🎣', 'Hồ câu')}${ic('kho', '🎒', 'Túi đồ')}`;
+  $('dock').innerHTML = `${ic('home', '🏠', 'Nhà riêng')}<div class="kp-track"><span class="kp-road"></span>${kps}</div>${ic('market', '🛒', 'Chợ')}${ic('cafe', '☕', 'Cà phê')}${ic('fish', '🎣', 'Hồ câu')}${ic('kho', '🎒', 'Túi đồ')}`;
   $('topicons').innerHTML = `
     <button class="top-ic" data-nav="news" title="Tin khu phố (N)" aria-label="Tin khu phố"><span aria-hidden="true">📰</span>${R.unread ? `<span class="badge">${Math.min(R.unread, 9)}</span>` : ''}<em>Tin</em></button>
     <button class="top-ic" data-nav="neighbors" title="Hàng xóm (X)" aria-label="Hàng xóm"><span aria-hidden="true">👥</span><em>Hàng xóm</em></button>
@@ -1466,7 +1801,7 @@ function renderCtx() {
   } else if (R.view === 'cafe') {
     html = `<div class="ctx-card chat"><div id="chat-log" class="chat-log" aria-live="polite"></div>
       <form id="chat-form" class="chat-form"><input id="chat-input" maxlength="80" autocomplete="off" placeholder="Gõ đi bạn ơi… (Enter để gửi)" aria-label="Tin nhắn" /><button class="mini" type="submit">Gửi</button></form></div>
-      <button class="btn" data-nav="cafelist">Mời cà phê</button>`;
+      <div class="ctx-col"><button class="btn green" data-nav="fun">Trò chơi</button><button class="btn" data-nav="cafelist">Mời cà phê</button></div>`;
   } else if (R.view === 'fish') {
     const FS = S.fishing, F = R.fish;
     const label = F.state === 'bite' ? 'GIẬT!' : F.state === 'wait' || F.state === 'cast' ? 'Đang chờ…' : F.state === 'reel' ? 'Kéo lên…' : 'Thả câu';
@@ -1494,7 +1829,7 @@ function onUiClick(e) {
     if (go === 'home') enterView('home');
     else if (go === 'kp0') { S.cur = 0; enterView('street'); }
     else if (go === 'kp1') { if (S.streets.length < 2) openModal('Mở rộng làm ăn', street2HTML(), { kind: 'street2' }); else { S.cur = 1; enterView('street'); } }
-    else if (go === 'market') openMarket();
+    else if (go === 'market') enterView('market');
     else if (go === 'cafe') openCafe();
     else if (go === 'fish') openPond();
     else if (go === 'kho') openKho();
@@ -1507,6 +1842,7 @@ function onUiClick(e) {
   else if (nav === 'cafelist') openModal('Quán cà phê cóc', cafeHTML(), { kind: 'cafe' });
   else if (nav === 'collect') { collectAll(); renderCtx(); }
   else if (nav === 'news') openNews();
+  else if (nav === 'fun') openFun();
   else if (nav === 'fishact') fishAction();
   else if (nav === 'basket') openModal('Giỏ cá', basketHTML(), { kind: 'basket' });
   else if (nav === 'book') openModal('Sổ câu', bookHTML(), { kind: 'book' });
@@ -1534,7 +1870,7 @@ function updateHUD() {
   $('clock-val').textContent = clock();
   $('debt-val').textContent = S.debt ? 'Nợ ' + fmtK(S.debt) : 'Không nợ';
   $('debt-val').classList.toggle('owe', S.debt > 0);
-  $('place-val').textContent = R.view === 'neighbor' ? 'Nhà ' + nbBase(R.visit).name : R.view === 'cafe' ? `Quán cà phê · ${Net.roomPlayers().length + 1} người` : R.view === 'fish' ? 'Hồ câu' : R.view === 'home' ? 'Nhà riêng' : `Khu phố ${S.cur + 1}`;
+  $('place-val').textContent = R.view === 'neighbor' ? 'Nhà ' + nbBase(R.visit).name : R.view === 'cafe' ? `Quán cà phê · ${Net.roomPlayers().length + 1} người` : R.view === 'fish' ? 'Hồ câu' : R.view === 'home' ? 'Nhà riêng' : R.view === 'market' ? 'Chợ đầu mối' : `Khu phố ${S.cur + 1}`;
 }
 
 // ================================================================
@@ -1543,6 +1879,7 @@ function updateHUD() {
 function buildBg(id) {
   const wide = id.startsWith('street') || id.startsWith('nb_');
   const BW = wide ? STREET_W : W;
+  const PM = wide ? 0 : (W - SW) / 2;   // lề thêm hai bên cho màn hình rộng
   const c = document.createElement('canvas');
   c.width = BW; c.height = H;
   const g = c.getContext('2d');
@@ -1553,17 +1890,20 @@ function buildBg(id) {
   for (let x = -20; x < BW;) {
     const w = 50 + rnd() * 90, h = 80 + rnd() * 170;
     g.fillRect(x, GROUND - 250 - h, w, h + 250);
-    for (let wy = GROUND - 240 - h; wy < GROUND - 60; wy += 18) for (let wx = x + 6; wx < x + w - 8; wx += 14) if (rnd() < 0.5) lights.push({ x: wx, y: wy, w: 6, h: 8, on: rnd() < 0.5, warm: rnd() < 0.5, far: true });
+    for (let wy = GROUND - 240 - h; wy < GROUND - 60; wy += 18) for (let wx = x + 6; wx < x + w - 8; wx += 14) if (rnd() < 0.5) lights.push({ x: wx - PM, y: wy, w: 6, h: 8, on: rnd() < 0.5, warm: rnd() < 0.5, far: true });
     x += w + rnd() * 30;
   }
-  if (id === 'pond') { drawPondBg(g, rnd, rp, lights); return { canvas: c, lights, lamps }; }
+  g.save(); g.translate(PM, 0);
+  if (id === 'pond') { drawPondBg(g, rnd, rp, lights, PM); g.restore(); return { canvas: c, lights, lamps }; }
+  if (id === 'market') { drawMarketBg(g, rnd, lights, PM); g.restore(); drawMarketFloor(g, BW); return { canvas: c, lights, lamps }; }
   const fill = (a, b) => { let xx = a; while (xx < b - 1) { let w = 90 + Math.floor(rnd() * 50); if (b - (xx + w) < 60) w = b - xx; drawHouse(g, xx, w, rnd, rp, lights); xx += w; } };
-  if (id === 'cafe') { fill(-10, 270); fill(1010, W + 10); drawCafeFront(g, lights); }
-  else if (id === 'home') { fill(-10, 280); fill(1000, W + 10); drawHomeFront(g, lights); }
+  if (id === 'cafe') { fill(-10 - PM, 270); fill(1010, SW + 10 + PM); drawCafeFront(g, lights); }
+  else if (id === 'home') { fill(-10 - PM, 280); fill(1000, SW + 10 + PM); drawHomeFront(g, lights); }
   else { fill(-10, STREET_PAD); for (let i = 0; i < 6; i++) drawHouse(g, STREET_PAD + i * GIAN_W, GIAN_W, rnd, rp, lights); fill(STREET_PAD + 6 * GIAN_W, BW + 10); }
+  g.restore();
   drawSidewalk(g, rnd, BW, wide, id === 'street_1' || id.startsWith('nb_') || id === 'street_demo');
   if (wide) { drawHydrant(g, STREET_PAD - 40, 560); drawBin(g, BW - STREET_PAD + 40, 556); drawHydrant(g, gx(3) - GIAN_W / 2, 562); }
-  else if (id === 'home') drawBin(g, 1110, 556);
+  else if (id === 'home') drawBin(g, 1110 + PM, 556);
   drawWires(g, rnd, BW);
   return { canvas: c, lights, lamps };
 }
@@ -2047,6 +2387,7 @@ function bgIdNow() {
   if (R.view === 'fish') return 'pond';
   if (R.view === 'cafe') return 'cafe';
   if (R.view === 'home') return 'home';
+  if (R.view === 'market') return 'market';
   if (R.view === 'neighbor') return 'nb_' + R.visit;
   return R.attract ? 'street_demo' : 'street_' + S.cur;
 }
@@ -2059,7 +2400,7 @@ function render() {
   drawSky(h);
   ctx.save();
   ctx.translate(-cam, 0);
-  ctx.drawImage(bg.canvas, 0, 0);
+  ctx.drawImage(bg.canvas, -sceneMargin(), 0);
 
   // các vật cần xếp theo chiều sâu (y)
   const layer = [];
@@ -2116,6 +2457,7 @@ function render() {
     for (const p of portalsFor()) hits.push(drawPortal(p));
   } else if (R.view === 'cafe') drawCafeScene(hits, layer);
   else if (R.view === 'fish') drawPondScene(hits);
+  else if (R.view === 'market') marketObjects(hits, layer);
 
   if (R.view === 'street' && !R.attract) {
     people(R.buyers);
@@ -2130,6 +2472,7 @@ function render() {
     layer.push({ y: oy, draw: () => { drawPerson(ctx, { x: ox, y: oy, dir: 1, look: { scale: 1.15, ...npcLook(R.visit) }, moving: false, phase: 0 }); nameTag(ctx, b.name, ox, oy - 172, false, 'Chủ nhà'); } });
   }
   if (R.started && !R.attract && R.view !== 'fish' && R.view !== 'cafe') {
+    // (chợ, phố, nhà riêng: nhân vật đứng)
     const M = R.me;
     layer.push({ y: M.y, draw: () => {
       drawPerson(ctx, { x: M.x, y: M.y, dir: M.dir, look: { ...playerLook(), scale: 1.2 }, moving: M.moving, phase: M.phase });
@@ -2137,7 +2480,7 @@ function render() {
     } });
   }
   layer.sort((a, b) => a.y - b.y).forEach((o) => o.draw());
-  if (R.view !== 'fish' && R.view !== 'cafe') for (const b of [...R.bikes].sort((a, b2) => a.y - b2.y)) drawBike(ctx, b);
+  if (R.view !== 'fish' && R.view !== 'cafe' && R.view !== 'market') for (const b of [...R.bikes].sort((a, b2) => a.y - b2.y)) drawBike(ctx, b);
   if (R.police?.phase === 'drive') drawTruck(ctx, R.police.x, 660);
 
   // đêm xuống: phủ tối, đèn cửa sổ, đèn sạp
@@ -2242,31 +2585,34 @@ function drawCafeScene(hits, layer) {
     nameTag(ctx, S.player.name, my.x, top, true, `${fmt(S.money)} · Cấp ${S.level}`);
   } });
   seats.push({ id: 'me', x: my.x, top: top - 24 });
-  hits.push({ x: 0, y: 440, w: W, h: 190, kind: 'floor', pri: -1 });
+  hits.push({ x: -sceneMargin(), y: 440, w: W, h: 190, kind: 'floor', pri: -1 });
+  // góc giải trí
+  drawFunCorner(hits, layer);
   R.cafeSeats = seats;
 }
-function drawPondBg(g, rnd, rp, lights) {
-  for (let x = -10; x < W;) {
+function drawPondBg(g, rnd, rp, lights, PM = 0) {
+  const X0 = -PM, XW = SW + 2 * PM;
+  for (let x = X0 - 10; x < SW + PM;) {
     const w = 80 + rnd() * 60, h = 60 + rnd() * 70;
     g.fillStyle = rp(HOUSE_COLORS); g.fillRect(x, 330 - h, w, h);
     g.fillStyle = 'rgba(0,0,0,.1)'; g.fillRect(x + w - 4, 330 - h, 4, h);
     for (let k = x + 10; k < x + w - 16; k += 22) { g.fillStyle = '#2C3440'; g.fillRect(k, 330 - h + 14, 12, 16); lights.push({ x: k, y: 330 - h + 14, w: 12, h: 16, on: rnd() < 0.6, warm: true }); }
     x += w;
   }
-  for (let i = 0; i < 24; i++) { g.fillStyle = ['#2F6B3A', '#3F8A4A', '#4E9A52'][i % 3]; g.beginPath(); g.arc(rnd() * W, 326 + rnd() * 16, 24 + rnd() * 26, 0, 7); g.fill(); }
-  g.fillStyle = '#6FA05A'; g.fillRect(0, 344, W, 24);
+  for (let i = 0; i < 24; i++) { g.fillStyle = ['#2F6B3A', '#3F8A4A', '#4E9A52'][i % 3]; g.beginPath(); g.arc(X0 + rnd() * XW, 326 + rnd() * 16, 24 + rnd() * 26, 0, 7); g.fill(); }
+  g.fillStyle = '#6FA05A'; g.fillRect(X0, 344, XW, 24);
   const wg = g.createLinearGradient(0, 366, 0, H);
   wg.addColorStop(0, '#5FA8BE'); wg.addColorStop(1, '#1F5C73');
-  g.fillStyle = wg; g.fillRect(0, 366, W, H - 366);
+  g.fillStyle = wg; g.fillRect(X0, 366, XW, H - 366);
   g.strokeStyle = 'rgba(255,255,255,.13)'; g.lineWidth = 2;
-  for (let i = 0; i < 70; i++) { const x = rnd() * W, y = 380 + rnd() * 330, w = 20 + rnd() * 50; g.beginPath(); g.moveTo(x, y); g.lineTo(x + w, y); g.stroke(); }
+  for (let i = 0; i < 90; i++) { const x = X0 + rnd() * XW, y = 380 + rnd() * 330, w = 20 + rnd() * 50; g.beginPath(); g.moveTo(x, y); g.lineTo(x + w, y); g.stroke(); }
   for (let i = 0; i < 10; i++) {
     const x = 520 + rnd() * 700, y = 400 + rnd() * 240;
     g.fillStyle = '#3F8A4A'; g.beginPath(); g.moveTo(x, y); g.ellipse(x, y, 26, 9, 0, 0.35, Math.PI * 2 - 0.1); g.closePath(); g.fill();
     if (rnd() < 0.4) { g.fillStyle = '#F4A6C0'; g.beginPath(); g.arc(x + 6, y - 6, 6, 0, 7); g.fill(); }
   }
   // bờ gần, lau sậy
-  g.fillStyle = '#6FA05A'; g.beginPath(); g.moveTo(0, 520); g.quadraticCurveTo(140, 510, 200, 600); g.lineTo(230, H); g.lineTo(0, H); g.closePath(); g.fill();
+  g.fillStyle = '#6FA05A'; g.fillRect(X0, 520, PM, H - 520); g.beginPath(); g.moveTo(0, 520); g.quadraticCurveTo(140, 510, 200, 600); g.lineTo(230, H); g.lineTo(0, H); g.closePath(); g.fill();
   g.strokeStyle = '#4E7A3A'; g.lineWidth = 3;
   for (let i = 0; i < 26; i++) { const x = 150 + rnd() * 90, y = 560 + rnd() * 150; g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(x + 6, y - 30, x + 2 + rnd() * 10, y - 50 - rnd() * 20); g.stroke(); }
   // cầu gỗ chính
@@ -2316,7 +2662,7 @@ function drawPondScene(hits) {
     drawFloat(fx, fy, k < 1 ? 0 : dip);
   }
   for (const r of R.ripples) { ctx.strokeStyle = `rgba(255,255,255,${r.life * 0.6})`; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(r.x, r.y + 4, r.r, r.r * 0.35, 0, 0, 7); ctx.stroke(); }
-  hits.push({ x: 230, y: 360, w: W - 230, h: 260, kind: 'water' });
+  hits.push({ x: 230, y: 360, w: SW - 230 + sceneMargin(), h: 260, kind: 'water' });
 }
 function drawFloat(x, y, dip) {
   ctx.save(); ctx.translate(x, y);
@@ -2383,13 +2729,20 @@ canvas.addEventListener('pointerdown', (e) => {
   } else if (R.view === 'cafe') {
     if (h.kind === 'cafe') { const s = (R.cafeSeats || []).find((q) => q.id === h.id); walkTo((s?.x ?? p.x) + 70, 596, () => openProfile(h.id)); }
     else if (h.kind === 'chair') walkTo(h.sx, 596, () => { R.me.sit = { x: h.sx }; });
+    else if (h.kind === 'fun') walkTo(150, 596, openFun);
     else walkTo(p.x, p.y);
   } else if (R.view === 'fish' && h.kind === 'water') fishAction();
+  else if (R.view === 'market') {
+    if (h.kind === 'mstall') { const m = MARKET_STALLS.find((q) => q.id === h.id); walkTo(m.x, 560, () => openMarketStall(h.id)); }
+    else if (h.kind === 'board') walkTo(170, 560, () => openMarket());
+    else if (h.kind === 'boss') walkTo(MARKET_BOSS.x - 40, 560, () => openModal('Sổ nợ · Ông Chủ Mối', debtHTML(), { kind: 'debt' }));
+    else walkTo(p.x, p.y);
+  }
 });
 canvas.addEventListener('pointermove', (e) => {
   if (!R.started || R.modal) { R.hover = null; return; }
   const h = hitAt(toLogical(e));
-  R.hover = h && ['cash', 'trash', 'rat', 'chair', 'portal', 'kho', 'door', 'mail', 'land'].includes(h.kind) ? h : null;
+  R.hover = h && ['cash', 'trash', 'rat', 'chair', 'portal', 'kho', 'door', 'mail', 'land', 'mstall', 'board', 'boss', 'fun'].includes(h.kind) ? h : null;
   canvas.style.cursor = h && h.kind !== 'floor' ? 'pointer' : 'default';
 });
 const MOVE_KEYS = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'a', 'd', 'w', 's']);
@@ -2409,7 +2762,7 @@ window.addEventListener('keydown', (e) => {
   }
   if (R.modal) return;
   if (MOVE_KEYS.has(key)) { e.preventDefault(); R.keys.add(key); return; }
-  if (key === 'c') openMarket(); else if (key === 'k') openKho(); else if (key === 'x') openNeighbors();
+  if (key === 'c') enterView('market'); else if (key === 'k') openKho(); else if (key === 'x') openNeighbors();
   else if (key === 'f') openCafe(); else if (key === 't') openChar(); else if (key === 'n') openNews();
   else if (key === 'q') openPond(); else if (key === 'h') enterView('home');
   else if (/^[1-6]$/.test(key) && R.view === 'street') { const i = Number(key) - 1, f = frontOf(i); walkTo(f.x, f.y, () => openGian(S.cur, i)); }
@@ -2427,6 +2780,16 @@ document.addEventListener('visibilitychange', () => { if (document.hidden && R.s
 const stage = $('stage');
 function fit() {
   const app = $('app');
+  const aspect = app.clientWidth / Math.max(1, app.clientHeight);
+  const nw = clamp(Math.round((H * aspect) / 2) * 2, SW, 2400);   // màn rộng thì mở rộng khung, không chừa dải đen
+  if (nw !== W) {
+    W = nw;
+    canvas.width = W;
+    stage.style.width = W + 'px';
+    R.bgCache = {};
+    R.stars = Array.from({ length: Math.round(W / 20) }, () => ({ x: rand(0, W), y: rand(0, 300), r: rand(0.6, 1.6) }));
+    if (R.me) R.cam = camTarget();
+  }
   const s = Math.min(app.clientWidth / W, app.clientHeight / H);
   stage.style.transform = `translate(-50%, -50%) scale(${s})`;
 }
