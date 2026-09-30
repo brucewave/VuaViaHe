@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Vua Vỉa Hè</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Be+Vietnam+Pro:wght@400;600;700&display=swap" />
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <div id="rotate-prompt">
+      <div class="prompt-content">
+        <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+          <line x1="12" y1="18" x2="12.01" y2="18"></line>
+        </svg>
+        <p>Xoay ngang màn hình<br />cho khu phố rộng rãi nhé!</p>
+        <button class="btn paper" id="btn-rotate-skip">Chơi màn dọc luôn</button>
+      </div>
+    </div>
+
+    <div id="app">
+      <div id="stage">
+        <canvas id="game-canvas" width="1280" height="720"></canvas>
+
+        <div id="hud">
+          <div class="hud-group">
+            <div class="pill money"><span class="lbl">Tiền</span><b id="money-val">0đ</b></div>
+            <div class="pill level">
+              <span class="lvl-badge" id="level-val">1</span>
+              <div class="lvl-info">
+                <span class="lvl-title" id="title-val">Người bán dạo</span>
+                <span class="bar"><i id="xp-bar"></i></span>
+              </div>
+            </div>
+            <div class="pill energy" id="energy-pill" title="Năng lượng hồi 1 điểm mỗi 45 giây">
+              <span class="lbl">Sức</span>
+              <span class="bar"><i id="energy-bar"></i></span>
+              <b id="energy-val">20</b>
+            </div>
+            <div class="pill karma" id="karma-pill" title="Uy tín tăng khi làm ăn đàng hoàng, giảm khi chơi xấu hàng xóm">
+              <span class="lbl" id="karma-lbl">Uy tín</span><b id="karma-val">0</b>
+            </div>
+          </div>
+          <div class="hud-group">
+            <div class="pill place" id="place-val">Khu phố 1</div>
+            <div class="pill clock"><b id="clock-val">06:00</b><span id="debt-val">Không nợ</span></div>
+            <div id="topicons"></div>
+            <button class="icon-btn" id="btn-sound" aria-label="Tắt tiếng" title="Bật/tắt tiếng">♪</button>
+          </div>
+        </div>
+
+        <div id="street-tabs" hidden></div>
+        <div id="toasts" aria-live="polite"></div>
+
+        <div id="police-alert" role="alert" hidden>
+          <h3>CÔNG AN PHƯỜNG!</h3>
+          <p id="police-sub">Xe kiểm tra lấn chiếm vỉa hè đang tới. Gian nào chưa có giấy phép thì dẹp vô lẹ!</p>
+          <button class="btn" id="btn-flee">Dẹp hàng vô! <kbd>Space</kbd></button>
+          <div class="countdown"><i id="police-timer"></i></div>
+        </div>
+
+        <div id="ctx" hidden></div>
+        <footer id="dock" aria-label="Đi tới"></footer>
+
+        <div id="modal" hidden>
+          <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+            <div class="sheet-head">
+              <h2 id="modal-title"></h2>
+              <button class="btn paper" id="modal-close">Đóng<kbd>Esc</kbd></button>
+            </div>
+            <div id="modal-body"></div>
+          </div>
+        </div>
+
+        <div id="title-screen">
+          <div class="title-block">
+            <p class="eyebrow">Game mô phỏng buôn bán · Sài Gòn</p>
+            <h1 class="logo">Vua<br />Vỉa Hè</h1>
+            <p class="tagline">Thuê một gian ngoài vỉa hè, lên chợ đầu mối gom hàng, bày ra bán rồi đi thu tiền. Làm ăn lương thiện hay làm gian thương chọc phá hàng xóm là quyền của bạn. Coi chừng công an phường với dân anh chị đòi tiền bảo kê!</p>
+            <div class="title-btns">
+              <button class="btn big" id="btn-new">Chơi mới</button>
+              <button class="btn big blue" id="btn-continue" hidden>Chơi tiếp</button>
+            </div>
+          </div>
+          <div class="howto">
+            <h3>Cách buôn</h3>
+            <ol>
+              <li>Bấm xuống vỉa hè (hoặc phím mũi tên, WASD) để nhân vật đi lại. Đi hết phố là sang khu kế bên.</li>
+              <li>Lên <b>Chợ đầu mối</b> gom hàng về kho. Thiếu tiền thì mua chịu.</li>
+              <li>Bấm vào gian, chọn <b>Bày hàng</b>. Hàng tự bán dần theo thời gian.</li>
+              <li>Thấy đồng xu trên gian thì bấm để <b>thu tiền</b>.</li>
+              <li>Dọn rác, đuổi chuột, sắm giấy phép, trả hay không trả tiền <b>bảo kê</b>.</li>
+              <li>Ghé <b>hàng xóm</b> dọn giúp, hoặc chôm tiền, vứt rác nếu muốn làm gian thương.</li>
+              <li>Rảnh thì ra <b>Hồ câu</b>: phao chìm hẳn mới giật cần. Ghé <b>Quán cà phê</b> tán dóc, bấm vào ai để sang nhà chơi.</li>
+              <li>Mở đủ 6 gian thì mua thêm <b>Khu phố 2</b>.</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/main.js"></script>
+  </body>
+</html>
