@@ -761,7 +761,10 @@ small { display: block; font-size: 12px; color: var(--muted); line-height: 1.3; 
 #ctx { position: absolute; bottom: 82px; display: flex; gap: 10px; align-items: flex-end; }
 #ctx.ctx-street { right: 16px; }
 #ctx.ctx-fish { right: 16px; left: 16px; justify-content: space-between; }
-#ctx.ctx-cafe, #ctx.ctx-neighbor { left: 50%; transform: translateX(-50%); }
+#ctx.ctx-neighbor { left: 50%; transform: translateX(-50%); }
+#ctx.ctx-cafe { top: 72px; bottom: auto; left: 250px; align-items: center; }
+#ctx.ctx-cafe .ctx-card.chat { width: 340px; padding: 6px 8px; }
+#ctx.ctx-cafe > .btn { font-size: 15px; padding: 8px 14px; min-width: 0; }
 .ctx-card { background: rgba(35, 26, 20, 0.88); border: 3px solid var(--ink); border-radius: 16px; padding: 8px 10px; display: flex; flex-direction: column; gap: 8px; }
 .ctx-card .btn-row .btn { font-size: 15px; padding: 6px 12px; min-width: 0; }
 .ctx-note { color: var(--paper-2); font-size: 13px; line-height: 1.35; max-width: 460px; }

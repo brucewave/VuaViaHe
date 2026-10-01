@@ -267,7 +267,7 @@ const R = {
   cafeSay: {}, cafeT: 0,
   clouds: Array.from({ length: 6 }, () => ({ x: rand(0, W), y: rand(40, 200), s: rand(0.6, 1.4) })),
   stars: Array.from({ length: 60 }, () => ({ x: rand(0, W), y: rand(0, 300), r: rand(0.6, 1.6) })),
-  credit: false, unread: 0, runners: [], cries: {}, guests: [], actor: null, boost: null, rain: null, 
+  credit: false, unread: 0, runners: [], cries: {}, marks: [], guests: [], actor: null, boost: null, rain: null, 
   fish: { state: 'idle', t: 0, fx: 780, fy: 560, nib: 0, catch: null },
   chat: [],
   ripples: [],
@@ -1396,7 +1396,7 @@ function marketObjects(hits, layer) {
       });
       nameTag(ctx, m.owner, x, MK_Y - 262, false, m.goods.some(cheap) ? 'Có món rẻ hôm nay!' : 'Mối hàng sỉ');
     } });
-    if (m.goods.some((id) => cheap(id) && GOODS[id].lvl <= S.level)) exclaim(x + 92, MK_Y - 272);
+    if (m.goods.some((id) => cheap(id) && GOODS[id].lvl <= S.level)) exclaim(x + 92, MK_Y - 290, 'Hàng rẻ');
     hits.push({ x: x - 120, y: 240, w: 240, h: MK_Y - 240 + 10, kind: 'mstall', id: m.id, pri: 2 });
   }
   const b = MARKET_BOSS;
@@ -1655,7 +1655,7 @@ function drawFunCorner(hits, layer) {
     ctx.fillStyle = '#FFF4D6'; rr(ctx, x - 62, 372, 124, 26, 6); ctx.fill(); ctx.strokeStyle = '#231A14'; ctx.lineWidth = 2; ctx.stroke();
     signText(ctx, 'GÓC GIẢI TRÍ', x, 385, 15, '#C0392B');
   } });
-  exclaim(x + 58, 380);
+  exclaim(x + 62, 352, 'Chơi');
   hits.push({ x: x - 70, y: 366, w: 140, h: 210, kind: 'fun', pri: 2 });
 }
 
@@ -2813,7 +2813,7 @@ function homeObjects(hits, layer) {
     signText(ctx, 'BÁN ĐẤT', o.x + 100, 468, 17, '#C0392B');
     nameTag(ctx, o.name, o.x, 538 - 156, false, S.quest === 'meet' ? 'Bấm để nói chuyện' : 'Bán đất');
   } });
-  if (S.quest === 'meet') exclaim(o.x, 538 - 196);
+  if (S.quest === 'meet') exclaim(o.x, 538 - 214, 'Nói chuyện');
   hits.push({ x: o.x - 70, y: 380, w: 230, h: 180, kind: 'oldman', pri: 2 });
   // hàng thanh lý = kho của mình
   layer.push({ y: 556, draw: () => {
@@ -2837,7 +2837,7 @@ function drawParkingSign(hits) {
   const x = 210, y = 560;
   ctx.strokeStyle = '#6E6A64'; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y + 50); ctx.stroke();
   ctx.fillStyle = '#1F6F8B'; rr(ctx, x - 70, y - 40, 140, 44, 8); ctx.fill(); ctx.strokeStyle = '#FFF4D6'; ctx.lineWidth = 2.5; ctx.stroke();
-  signText(ctx, 'BÃI XE · TRẠM BUÝT', x, y - 18, 14, '#FFF4D6', 128);
+  signText(ctx, 'BÃI GIỮ XE', x, y - 18, 14, '#FFF4D6', 128);
   hits.push({ x: x - 76, y: y - 46, w: 152, h: 100, kind: 'parking', pri: 3 });
 }
 
@@ -2862,10 +2862,23 @@ function drawHomeFront(g, lights) {
   g.fillStyle = '#F7B32B'; g.beginPath(); g.arc(x0 + 210, top + 118, 10, 0, 7); g.fill();
   g.fillStyle = '#8C6A4A'; rr(g, x0 + 150, GROUND - 60, 28, 24, 3); g.fill();
 }
-function exclaim(x, y) {
-  const b = Math.sin(R.t * 5) * 4;
-  ctx.fillStyle = '#6BA368'; ctx.beginPath(); ctx.arc(x, y + b, 13, 0, 7); ctx.fill(); ctx.strokeStyle = '#231A14'; ctx.lineWidth = 2.5; ctx.stroke();
-  ctx.fillStyle = '#fff'; ctx.font = '800 18px "Baloo 2", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('!', x, y + b + 1);
+// dấu "!" báo có việc: gom lại, vẽ sau cùng để không bị người, bảng tên che
+function exclaim(x, y, label) { R.marks.push({ x, y, label }); }
+function drawMarks() {
+  for (const m of R.marks) {
+    const b = Math.sin(R.t * 5) * 5, y = m.y + b, pulse = (R.t * 1.4) % 1;
+    ctx.strokeStyle = `rgba(247,201,72,${1 - pulse})`; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(m.x, y, 20 + pulse * 16, 0, 7); ctx.stroke();
+    ctx.fillStyle = '#F7C948'; ctx.strokeStyle = '#231A14'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(m.x, y, 20, 0, 7); ctx.moveTo(m.x - 7, y + 17); ctx.lineTo(m.x, y + 30); ctx.lineTo(m.x + 7, y + 17); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#F7C948'; ctx.beginPath(); ctx.arc(m.x, y, 17.5, 0, 7); ctx.fill();
+    ctx.fillStyle = '#C0392B'; ctx.font = '900 30px "Baloo 2", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('!', m.x, y + 2);
+    if (m.label) {
+      ctx.font = '800 13px "Baloo 2", sans-serif';
+      const w = ctx.measureText(m.label).width + 16;
+      ctx.fillStyle = '#231A14'; rr(ctx, m.x - w / 2, y - 48, w, 22, 11); ctx.fill();
+      ctx.fillStyle = '#FFE08A'; ctx.fillText(m.label, m.x, y - 36);
+    }
+  }
 }
 function drawPortal(p) {
   const x = p.side < 0 ? 70 : worldW() - 70, y = p.y || 470;
@@ -3458,9 +3471,9 @@ function renderCtx() {
     html = `<div class="ctx-card"><div class="tools">${tools.map(([k, n, s]) => `<button class="tool${R.tool === k ? ' on' : ''}" data-tool="${k}">${n}<small>${s}</small></button>`).join('')}</div>
       <p class="ctx-note">${R.tool === 'hand' ? 'Bấm rác, chuột để dọn giúp. Bấm đồng xu trên gian để chôm tiền két.' : `Bấm vào một gian để ${R.tool === 'goods' ? 'lẻn bốc hàng trên sạp về kho' : R.tool === 'trash' ? 'vứt rác' : 'thả chuột'}. Uy tín giảm, dễ bị bắt quả tang.`}</p></div>`;
   } else if (R.view === 'cafe') {
-    html = `<div class="ctx-card chat"><div id="chat-log" class="chat-log" aria-live="polite"></div>
-      <form id="chat-form" class="chat-form"><input id="chat-input" maxlength="80" autocomplete="off" placeholder="Gõ đi bạn ơi… (Enter để gửi)" aria-label="Tin nhắn" /><button class="mini" type="submit">Gửi</button></form></div>
-      <div class="ctx-col"><button class="btn green" data-nav="fun">Trò chơi</button><button class="btn blue" data-nav="veso">Vé số</button><button class="btn" data-nav="cafelist">Mời cà phê</button></div>`;
+    // thanh gọn phía trên, chừa chỗ cho bàn ghế và người ngồi; lời chat hiện thành bong bóng trên đầu
+    html = `<div class="ctx-card chat"><form id="chat-form" class="chat-form"><input id="chat-input" maxlength="80" autocomplete="off" placeholder="Nói gì đó… (Enter để gửi)" aria-label="Tin nhắn" /><button class="mini" type="submit">Gửi</button></form></div>
+      <button class="btn green" data-nav="fun">Trò chơi</button><button class="btn blue" data-nav="veso">Vé số</button><button class="btn" data-nav="cafelist">Mời cà phê</button>`;
   } else if (R.view === 'fish') {
     const FS = S.fishing, F = R.fish;
     const label = F.state === 'bite' ? 'GIẬT!' : F.state === 'wait' || F.state === 'cast' ? 'Đang chờ…' : F.state === 'reel' ? 'Kéo lên…' : 'Thả câu';
@@ -4208,6 +4221,7 @@ function render() {
   const h = gameHour();
   const bg = getBg(bgIdNow());
   const hits = [];
+  R.marks = [];
   const cam = Math.round(R.cam);
   ctx.clearRect(0, 0, W, H);
   drawSky(h);
@@ -4382,6 +4396,7 @@ function render() {
   if (R.view === 'fish') drawFishOverlay();
   // điểm đến khi bấm đi
   if (R.me.moving && !R.keys.size && R.view !== 'fish') { ctx.strokeStyle = 'rgba(255,244,214,.8)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(R.me.tx, R.me.ty, 16, 5, 0, 0, 7); ctx.stroke(); }
+  drawMarks();
   if (R.hover) { ctx.strokeStyle = 'rgba(255,244,214,.9)'; ctx.lineWidth = 3; ctx.setLineDash([6, 6]); rr(ctx, R.hover.x, R.hover.y, R.hover.w, R.hover.h, 10); ctx.stroke(); ctx.setLineDash([]); }
   for (const p of R.parts) {
     ctx.globalAlpha = clamp(p.life / p.max, 0, 1);
@@ -4452,7 +4467,7 @@ function drawVesoCorner(hits, layer) {
     ctx.fillStyle = '#F7E1A0'; ctx.fillRect(x - 40, 520, 26, 18); ctx.strokeStyle = '#C0392B'; ctx.lineWidth = 2; ctx.strokeRect(x - 40, 520, 26, 18);
     nameTag(ctx, 'Cô Năm vé số', x, 596 - 196, false, pend ? `Bạn giữ ${pend} tờ` : 'Vé số đây!');
   } });
-  exclaim(x + 58, 596 - 214);
+  exclaim(x + 62, 596 - 232, pend ? 'Dò số' : 'Vé số');
   hits.push({ x: x - 40, y: 410, w: 80, h: 190, kind: 'veso', pri: 2 });
 }
 // Hồ câu: một hồ tròn giữa bãi cỏ, cầu gỗ chìa ra từ bờ trái. Phao chỉ rơi ở nửa trên của hồ
@@ -4620,7 +4635,7 @@ canvas.addEventListener('pointerdown', (e) => {
     if (h.kind === 'door') walkTo(640, WALK_Y0 + 4, openChar);
     else if (h.kind === 'oldman') walkTo(OLD_TU.x + 70, 560, talkOldTu);
     else if (h.kind === 'kho') walkTo(900, 560, openKho);
-    else if (h.kind === 'mail') walkTo(400, WALK_Y0 + 6, openNews);
+    else if (h.kind === 'mail') walkTo(820, 560, openNews);
     else walkFloor();
   } else if (R.view === 'cafe') {
     if (h.kind === 'cafe') { const s = (R.cafeSeats || []).find((q) => q.id === h.id); walkTo((s?.x ?? p.x) + 70, 596, () => openProfile(h.id)); }
