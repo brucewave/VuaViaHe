@@ -883,3 +883,9 @@ button.slot-cell:hover { filter: brightness(1.08); }
 .pcard.r { color: #C0392B; }
 .pcard.b { color: #231A14; }
 .pcard.back { background: repeating-linear-gradient(45deg, #1F6F8B 0 8px, #2F5D8A 8px 16px); }
+
+/* thanh dưới gọn hơn để vỉa hè rộng ra */
+#dock { height: 56px; bottom: 4px; padding: 2px 10px; }
+.nav-ic .ni { font-size: 22px; }
+.nav-ic .nl { font-size: 12px; }
+#ctx { bottom: 70px; }
