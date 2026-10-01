@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <!-- phin nhôm -->
+  <path d="M34 22 h60 l-4 10 h-52 Z" fill="#C9CED6" stroke="#2A1D14" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M44 32 h40 v12 h-40 Z" fill="#AEB4BE" stroke="#2A1D14" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M40 14 h48" stroke="#2A1D14" stroke-width="9" stroke-linecap="round"/>
+  <path d="M40 14 h48" stroke="#E7EAF0" stroke-width="4" stroke-linecap="round"/>
+  <!-- ly thủy tinh: cà phê sữa đá -->
+  <path d="M32 46 h64 l-7 66 a6 6 0 0 1 -6 5 h-38 a6 6 0 0 1 -6 -5 Z" fill="#E9F3F8" stroke="#2A1D14" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M36 62 h56 l-5 48 a4 4 0 0 1 -4 3 h-38 a4 4 0 0 1 -4 -3 Z" fill="#7A4A2A"/>
+  <path d="M37 86 h54 l-3 24 a4 4 0 0 1 -4 3 h-38 a4 4 0 0 1 -4 -3 Z" fill="#D9A877"/>
+  <!-- đá -->
+  <rect x="46" y="58" width="16" height="14" rx="3" fill="#FFFFFF" fill-opacity=".85" stroke="#2A1D14" stroke-width="3"/>
+  <rect x="66" y="66" width="15" height="13" rx="3" fill="#FFFFFF" fill-opacity=".85" stroke="#2A1D14" stroke-width="3"/>
+  <!-- ánh sáng -->
+  <path d="M40 54 l-2 20" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round"/>
+  <!-- giọt cà phê nhỏ từ phin -->
+  <path d="M64 46 v8" stroke="#5A3418" stroke-width="4" stroke-linecap="round"/>
+</svg>

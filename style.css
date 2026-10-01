@@ -892,9 +892,9 @@ button.slot-cell:hover { filter: brightness(1.08); }
 
 /* ---------- Nhiệm vụ và hội thoại ---------- */
 .quest {
-  position: absolute; left: 12px; top: 214px;
+  position: absolute; left: 12px; top: 240px;
   max-width: 340px;
-  flex-direction: column; align-items: flex-start; gap: 4px;
+  align-items: center; gap: 10px;
   font: 600 14px/1.35 var(--font-body);
   background: #FFF1BF;
   animation: pop 0.3s ease-out;
@@ -950,3 +950,23 @@ button.slot-cell:hover { filter: brightness(1.08); }
 .shop-hero b { font: 800 30px/1 var(--font-display); }
 .shop-hero small { color: var(--paper-2); font-size: 14px; }
 .shop-hero .shop-props { font-size: 34px; letter-spacing: 8px; }
+
+/* ---------- Icon ảnh (public/assets/ui) ---------- */
+#hud .pill .hi { width: 34px; height: 34px; object-fit: contain; margin: -8px -2px -8px -10px; filter: drop-shadow(0 2px 0 rgba(35, 26, 20, 0.45)); }
+#hud .level { padding: 4px 14px 4px 4px; gap: 10px; }
+#hud .avatar { position: relative; width: 56px; height: 56px; flex: none; }
+#hud-face { width: 56px; height: 56px; border: 3px solid var(--ink); border-radius: 12px; display: block; }
+#hud .level .lvl-badge { position: absolute; left: 50%; bottom: -9px; transform: translateX(-50%); width: auto; height: auto; clip-path: none; background: var(--tarp); color: var(--paper); border: 2px solid var(--ink); border-radius: 8px; padding: 2px 6px 1px; font-size: 12px; white-space: nowrap; }
+#hud .level .lvl-badge::before { content: 'Lv.'; }
+.lvl-info { gap: 3px; }
+.lvl-name { font-size: 18px; }
+.lvl-title { font: 700 11px/1 var(--font-body); color: var(--muted); }
+.energy { gap: 8px; }
+.e-main { display: flex; flex-direction: column; gap: 3px; }
+.e-row { display: flex; align-items: center; gap: 8px; }
+.e-next { font: 700 10px/1 var(--font-body); color: var(--muted); }
+.top-ic img { width: 30px; height: 30px; object-fit: contain; margin-top: -2px; }
+.nav-ic img.ni { width: 32px; height: 32px; object-fit: contain; filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.35)); }
+#btn-settings { pointer-events: auto; }
+.quest .q-ic { width: 34px; height: 34px; object-fit: contain; flex: none; }
+.quest .q-main { display: flex; flex-direction: column; gap: 3px; }
