@@ -217,7 +217,7 @@ function freshState() {
   const t = now();
   const s = {
     v: 2, money: 120000, xp: 0, level: 1, energy: 20, energyAt: t, karma: 0,
-    kho: { kem_chuoi: 10, tra_da: 20 }, khoLvl: 0,
+    kho: {}, khoLvl: 0, quest: 'meet',
     streets: [{ gians: Array.from({ length: 6 }, (_, i) => newGian(i === 0)) }], cur: 0,
     debt: 0, debtAt: t, prices: {}, prevPrices: {}, pricesAt: 0,
     player: { name: 'Bạn' },
@@ -226,7 +226,6 @@ function freshState() {
     neighbors: NB_BASE.map(newNeighbor), news: [], lastTick: t, tips: {},
     stats: { sold: 0, earned: 0, stolen: 0, cleaned: 0, fines: 0 },
   };
-  s.streets[0].gians[0].slots[0] = { good: 'kem_chuoi', qty: 10, prog: 0 };
   return s;
 }
 let S = freshState();
@@ -291,6 +290,7 @@ function applySave(d) {
   for (const slot of Object.keys(S.outfit)) if (S.outfit[slot] && !FASHION[S.outfit[slot]]) S.outfit[slot] = null;
   if (!RODS[S.fishing.rod]) S.fishing.rod = 'tre';
   if (!Array.isArray(S.streets) || !S.streets.length) S.streets = f.streets;
+  if (d.quest === undefined) S.quest = 'done';   // bản lưu cũ đã qua phần mở đầu
   S.streets.forEach((st) => {
     st.gians = st.gians.map((g) => {
       const n = { ...newGian(false), ...g };
@@ -432,6 +432,7 @@ function collect(si, i, quiet) {
     R.parts.push({ type: 'text', x: gx(i), y: 232, vy: -40, text: '+' + fmt(amt), color: '#FFE08A', life: 1.4, max: 1.4 });
     Snd.coin();
   }
+  questProgress('collect');
   if (!S.tips.collected) { S.tips.collected = 1; toast('Thu tiền xong! Hết hàng thì bấm vào gian để <b>Bày hàng</b> tiếp từ kho.', 'gold'); }
   return amt;
 }
@@ -453,6 +454,7 @@ function stockSlot(si, i, k, id) {
   s.qty += n; S.kho[id] -= n;
   if (!S.kho[id]) delete S.kho[id];
   Snd.buy();
+  questProgress('stock');
   if (!S.tips.stocked) { S.tips.stocked = 1; toast('Bày xong! Mỗi ô bán song song. Có đồng xu hiện lên trên gian là bấm vào để thu tiền.', 'gold'); }
 }
 function unstockSlot(si, i, k) {
@@ -567,6 +569,7 @@ function buy(id, n) {
   S.money -= fromCash; cost -= fromCash;
   if (cost > 0) { if (!S.debt) S.debtAt = now(); S.debt += cost; }
   S.kho[id] = (S.kho[id] || 0) + k;
+  questProgress('buy');
   Snd.buy();
   refreshModal();
 }
@@ -995,14 +998,16 @@ function placeMe(x, y) {
 }
 function enterView(view, opts = {}) {
   R.view = view;
+  R.busOut = null;
   if (view !== 'neighbor') R.visit = null;
   R.walkers = []; R.buyers = []; R.visitors = []; R.bikes = [];
   closeModal();
   if (view === 'street' || view === 'neighbor') placeMe(opts.fromRight ? STREET_W - 160 : 170, 560);
-  else if (view === 'home') placeMe(opts.fromRight ? SW - 140 : 640, 566);
-  else if (view === 'market') placeMe(640, 590);
+  else if (view === 'home') placeMe(opts.fromRight ? SW - 140 : opts.fromLeft ? 150 : 640, 566);
+  else if (view === 'market') placeMe(opts.fromRight ? SW - 150 : opts.arrive ? 210 : 640, 600);
   else if (view === 'cafe') placeMe(640, 596);
   else if (view === 'fish') placeMe(420, 606);
+  if (!R.trip) R.me.hidden = false;
   renderDock();
 }
 function updateMe(dt) {
@@ -1010,7 +1015,7 @@ function updateMe(dt) {
   const k = R.keys;
   const vx = (k.has('ArrowRight') || k.has('d') ? 1 : 0) - (k.has('ArrowLeft') || k.has('a') ? 1 : 0);
   const vy = (k.has('ArrowDown') || k.has('s') ? 1 : 0) - (k.has('ArrowUp') || k.has('w') ? 1 : 0);
-  if ((vx || vy) && !R.modal && R.view !== 'fish') {
+  if ((vx || vy) && !R.modal && !R.dlg && !R.trip && R.view !== 'fish') {
     const b = walkBand();
     M.then = null; M.sit = null;
     M.tx = clamp(M.x + vx * 40, b.x0, b.x1); M.ty = clamp(M.y + vy * 30, b.y0, b.y1);
@@ -1032,7 +1037,8 @@ function updateMe(dt) {
 }
 // đi hết đầu/cuối phố thì sang khu kế bên
 function portalsFor() {
-  if (R.view === 'home') return [{ side: 1, label: 'KHU PHỐ 1', go: () => { S.cur = 0; enterView('street'); } }];
+  if (R.view === 'home') return [{ side: 1, label: 'KHU PHỐ 1', go: () => { S.cur = 0; enterView('street'); } }, { side: -1, label: 'CHỢ ĐẦU MỐI', go: () => enterView('market', { fromRight: true }) }];
+  if (R.view === 'market') return [{ side: 1, label: 'NHÀ RIÊNG', y: 560, go: () => enterView('home', { fromLeft: true }) }];
   if (R.view === 'neighbor') return [{ side: -1, label: 'VỀ NHÀ', go: () => enterView('home', { fromRight: true }) }];
   if (R.view !== 'street') return [];
   const list = [];
@@ -1419,6 +1425,275 @@ function drawFunCorner(hits, layer) {
   hits.push({ x: x - 70, y: 366, w: 140, h: 210, kind: 'fun', pri: 2 });
 }
 
+// ---------- Đi lại: xe máy, xe buýt, đi bộ ----------
+const FUEL_COST = 3000, BUS_FARE = 6000;
+const BIKE_SPOT = { home: { x: 640, y: 654 }, street: { x: 330, y: 654 } };
+const BUS_STOP = { home: { x: 1120 }, street: { x: 220 } };
+const DEST_NAME = { home: 'Nhà riêng', kp0: 'Khu phố 1', kp1: 'Khu phố 2', market: 'Chợ đầu mối', cafe: 'Quán cà phê', fish: 'Hồ câu' };
+const curDest = () => (R.view === 'street' ? 'kp' + S.cur : R.view);
+const spotKey = () => (R.view === 'home' ? 'home' : R.view === 'street' ? 'street' : null);
+function goDest(d, opts = {}) {
+  if (d === 'home') enterView('home', opts);
+  else if (d === 'kp0' || d === 'kp1') { S.cur = Number(d[2]); enterView('street', opts); }
+  else if (d === 'market') enterView('market', opts);
+  else if (d === 'cafe') openCafe();
+  else if (d === 'fish') openPond();
+}
+function destsFor(mode) {
+  const all = ['home', 'kp0', ...(S.streets.length > 1 ? ['kp1'] : []), 'market', ...(mode === 'bike' ? ['cafe', 'fish'] : [])];
+  return all.filter((d) => d !== curDest());
+}
+// mode: 'bike' | 'bus' | 'walk'
+function startTrip(mode, dest) {
+  if (R.trip || dest === curDest()) return;
+  if (dest === 'kp1' && S.streets.length < 2) { openModal('Mở rộng làm ăn', street2HTML(), { kind: 'street2' }); return; }
+  const cost = mode === 'bike' ? FUEL_COST : mode === 'bus' ? BUS_FARE : 0;
+  if (S.money < cost) {
+    if (mode === 'bike') { toast('Hết tiền đổ xăng, đành đi bộ vậy!', 'bad'); mode = 'walk'; }
+    else { toast(`Không đủ ${fmt(cost)} mua vé xe buýt.`, 'bad'); return; }
+  }
+  const realCost = mode === 'bike' ? FUEL_COST : mode === 'bus' ? BUS_FARE : 0;
+  S.money -= realCost; S.stats.food = (S.stats.food || 0) + realCost;
+  closeDialog(); closeModal();
+  const k = spotKey();
+  const T = { mode, dest, phase: 'go', t: 0 };
+  if (mode === 'bike' && k) { T.x = BIKE_SPOT[k].x; T.y = BIKE_SPOT[k].y; R.me.hidden = true; Snd.tone(180, 0.3, 'sawtooth', 0.03); }
+  else if (mode === 'bus' && k) { T.stop = BUS_STOP[k].x; T.busX = R.cam + W + 360; }
+  else T.phase = 'card';
+  R.trip = T; R.me.then = null; R.keys.clear();
+}
+function updateTrip(dt) {
+  if (R.busOut) { R.busOut.x -= dt * 480; if (R.busOut.x < R.cam - 420) R.busOut = null; }
+  const T = R.trip;
+  if (!T) return;
+  T.t += dt;
+  if (T.phase === 'go') {
+    if (T.mode === 'bike') {
+      if (T.t > 0.35) T.x += dt * (260 + (T.t - 0.35) * 1100);
+      if (T.x > R.cam + W + 160) { T.phase = 'card'; T.t = 0; }
+    } else {
+      if (!T.boarded) {
+        T.busX = Math.max(T.stop - 60, T.busX - dt * 820);
+        if (T.busX <= T.stop - 59) { T.wait = (T.wait || 0) + dt; if (T.wait > 0.35) { T.boarded = true; R.me.hidden = true; Snd.tone(500, 0.1, 'square', 0.03); } }
+      } else {
+        T.busX -= dt * (320 + (T.t * 520));
+        if (T.busX < R.cam - 420) { T.phase = 'card'; T.t = 0; }
+      }
+    }
+  } else if (T.phase === 'card') {
+    if (T.t > (T.mode === 'walk' ? 1.6 : 1.3)) {
+      goDest(T.dest, { arrive: T.mode });
+      const k = spotKey();
+      T.phase = 'arrive'; T.t = 0;
+      if (T.mode === 'bike' && k) { T.x = R.cam - 200; T.y = BIKE_SPOT[k].y; R.me.hidden = true; }
+      else if (T.mode === 'bus' && k) { T.stop = BUS_STOP[k].x; T.busX = R.cam + W + 360; T.boarded = true; R.me.hidden = true; T.dropped = false; }
+      else { R.trip = null; R.me.hidden = false; arrivedMsg(T); }
+    }
+  } else if (T.phase === 'arrive') {
+    const k = spotKey();
+    if (T.mode === 'bike') {
+      const tx = BIKE_SPOT[k].x;
+      T.x = Math.min(tx, T.x + dt * Math.max(180, (tx - T.x) * 3));
+      if (T.x >= tx - 1) { placeMe(tx + 30, WALK_Y1 - 4); R.me.hidden = false; R.trip = null; arrivedMsg(T); }
+    } else {
+      if (!T.dropped) {
+        T.busX = Math.max(T.stop - 60, T.busX - dt * 820);
+        if (T.busX <= T.stop - 59) { T.wait = (T.wait || 0) + dt; if (T.wait > 0.3) { placeMe(T.stop, WALK_Y1 - 4); R.me.hidden = false; R.busOut = { x: T.busX }; R.trip = null; arrivedMsg(T); } }
+      }
+    }
+  }
+}
+function arrivedMsg(T) {
+  const how = T.mode === 'bike' ? 'Chạy xe máy' : T.mode === 'bus' ? 'Đi xe buýt' : 'Đi bộ';
+  toast(`${how} tới ${DEST_NAME[T.dest]}.${T.dest === 'market' && T.mode !== 'walk' ? ' Gửi xe ở bãi rồi đi bộ vô chợ.' : ''}`);
+}
+function drawBus(g, x, y, dir = -1) {
+  g.save(); g.translate(x, y); g.scale(-dir, 1);
+  g.fillStyle = 'rgba(0,0,0,.25)'; g.beginPath(); g.ellipse(150, 0, 160, 8, 0, 0, 7); g.fill();
+  g.fillStyle = '#2E8B57'; rr(g, 0, -150, 300, 132, 14); g.fill(); g.strokeStyle = '#231A14'; g.lineWidth = 3; g.stroke();
+  g.fillStyle = '#F2F2EE'; g.fillRect(0, -64, 300, 10);
+  g.fillStyle = '#BFD9E6'; for (let k = 0; k < 6; k++) g.fillRect(14 + k * 42, -130, 34, 44);
+  g.fillStyle = '#E8C547'; rr(g, 230, -146, 62, 18, 4); g.fill();
+  g.fillStyle = '#231A14'; g.font = '800 13px "Baloo 2", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('BUÝT 52', 261, -136);
+  g.fillStyle = '#1F5C3E'; g.fillRect(262, -122, 30, 92);
+  wheel(g, 60, -18, 20, R.t * 6); wheel(g, 240, -18, 20, R.t * 6);
+  g.restore();
+}
+function drawBusStop(g, x) {
+  g.fillStyle = '#6E6A64'; g.fillRect(x - 3, 470, 6, 150);
+  g.fillStyle = '#1F6F8B'; rr(g, x - 46, 444, 92, 40, 6); g.fill(); g.strokeStyle = '#FFF4D6'; g.lineWidth = 2.5; g.stroke();
+  g.fillStyle = '#FFF4D6'; g.font = '800 13px "Baloo 2", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText('TRẠM', x, 456); g.fillText('XE BUÝT', x, 472);
+  g.fillStyle = '#8C6A4A'; g.fillRect(x + 14, 600, 70, 8); g.fillRect(x + 18, 608, 6, 16); g.fillRect(x + 74, 608, 6, 16);
+}
+// vẽ xe của mình đang dựng, xe đang chạy, xe buýt của chuyến đi
+function drawVehicles(hits) {
+  const k = spotKey();
+  const T = R.trip;
+  const pl = playerLook();
+  const myBike = (x, y, riding) => drawBike(ctx, { x, y, dir: 1, color: '#6BA368', parked: !riding, rider: { skin: pl.skin, shirt: pl.shirt, helmet: '#D98E04' }, pass: null, cargo: false });
+  if (k) {
+    const s = BIKE_SPOT[k];
+    if (T && T.mode === 'bike' && T.phase !== 'card') myBike(T.x, T.y, true);
+    else {
+      myBike(s.x, s.y, false);
+      ctx.fillStyle = '#D7372B'; rr(ctx, s.x - 52, s.y - 62, 32, 26, 4); ctx.fill(); ctx.strokeStyle = '#231A14'; ctx.lineWidth = 2; ctx.stroke();
+      hits.push({ x: s.x - 60, y: s.y - 80, w: 120, h: 84, kind: 'bike', pri: 3 });
+    }
+    drawBusStop(ctx, BUS_STOP[k].x);
+    hits.push({ x: BUS_STOP[k].x - 50, y: 440, w: 140, h: 190, kind: 'busstop', pri: 2 });
+    if (T && T.mode === 'bus' && T.phase !== 'card') drawBus(ctx, T.busX, 660);
+    if (R.busOut) drawBus(ctx, R.busOut.x, 660);
+  }
+}
+function drawTripCard() {
+  const T = R.trip;
+  const grd = ctx.createLinearGradient(0, 0, 0, H);
+  grd.addColorStop(0, '#86C5E0'); grd.addColorStop(1, '#F3E3B8');
+  ctx.fillStyle = grd; ctx.fillRect(0, 0, W, H);
+  const off = (R.t * (T.mode === 'walk' ? 120 : 600)) % 160;
+  ctx.fillStyle = '#9CC5A1'; for (let x = -off * 0.4; x < W + 200; x += 180) { ctx.beginPath(); ctx.arc(x, 380, 70, Math.PI, 0); ctx.fill(); }
+  ctx.fillStyle = '#44474F'; ctx.fillRect(0, 420, W, 180);
+  ctx.fillStyle = '#E8C547'; for (let x = -off; x < W; x += 160) ctx.fillRect(x, 506, 80, 8);
+  const cx = W / 2, bob = Math.sin(R.t * 18) * 2;
+  const pl = playerLook();
+  if (T.mode === 'bike') drawBike(ctx, { x: cx, y: 560 + bob, dir: 1, color: '#6BA368', rider: { skin: pl.skin, shirt: pl.shirt, helmet: '#D98E04' }, pass: null, cargo: false });
+  else if (T.mode === 'bus') drawBus(ctx, cx + 150, 570 + bob, 1);
+  else drawPerson(ctx, { x: cx, y: 560, dir: 1, look: { ...pl, scale: 1.4 }, moving: true, phase: R.t * 10 });
+  const how = T.mode === 'bike' ? 'Đang chạy xe máy' : T.mode === 'bus' ? 'Đang đi xe buýt' : 'Đang đi bộ';
+  ctx.fillStyle = 'rgba(35,26,20,.85)'; rr(ctx, cx - 260, 150, 520, 70, 16); ctx.fill();
+  signText(ctx, `${how} tới ${DEST_NAME[T.dest]}…`, cx, 184, 30, '#FFE08A', 490);
+}
+function travelChoices(mode) {
+  const cost = mode === 'bike' ? FUEL_COST : BUS_FARE;
+  const dests = mode === 'bike' ? destsFor('bike') : destsFor('bus');
+  return [...dests.map((d) => ({ label: DEST_NAME[d], sub: d === 'kp1' && S.streets.length < 2 ? 'Chưa mua' : fmt(cost), fn: () => startTrip(mode, d) })), { label: 'Thôi', fn: closeDialog }];
+}
+
+// ---------- Hội thoại ----------
+function talk(name, look, lines, opts = {}) {
+  R.dlg = { name, look, lines: [].concat(lines), i: 0, choices: opts.choices || null, onDone: opts.onDone || null };
+  R.keys.clear();
+  showDlg();
+}
+function showDlg() {
+  const D = R.dlg;
+  $('dialog').hidden = false;
+  $('dlg-name').textContent = D.name;
+  $('dlg-text').innerHTML = D.lines[D.i];
+  const last = D.i >= D.lines.length - 1;
+  $('dlg-choices').innerHTML = last && D.choices
+    ? D.choices.map((c, k) => `<button class="btn ${k === D.choices.length - 1 && c.label === 'Thôi' ? 'paper' : ''}" data-dlg="${k}">${c.label}${c.sub ? `<small>${c.sub}</small>` : ''}</button>`).join('')
+    : `<button class="btn" data-dlg="next">${last ? 'Được rồi' : 'Tiếp'}<kbd>Space</kbd></button>`;
+  const cv = $('dlg-face'), g = cv.getContext('2d');
+  g.clearRect(0, 0, cv.width, cv.height);
+  g.fillStyle = '#F3E3B8'; rr(g, 0, 0, cv.width, cv.height, 12); g.fill();
+  g.save(); g.beginPath(); g.roundRect(0, 0, cv.width, cv.height, 12); g.clip();
+  g.translate(60, 262); g.scale(1.9, 1.9);
+  drawPerson(g, { x: 0, y: 0, dir: 1, look: { ...D.look, scale: 1 }, moving: false, phase: 0 });
+  g.restore();
+  Snd.tone(700 + Math.random() * 200, 0.04, 'triangle', 0.04);
+}
+function dlgNext() {
+  const D = R.dlg;
+  if (!D) return;
+  if (D.i < D.lines.length - 1) { D.i++; showDlg(); return; }
+  if (D.choices) return;
+  const f = D.onDone; closeDialog(); f?.();
+}
+function closeDialog() { R.dlg = null; $('dialog').hidden = true; }
+$('dialog').addEventListener('click', (e) => {
+  const t = e.target.closest('button');
+  if (!t || !R.dlg) return;
+  if (t.dataset.dlg === 'next') dlgNext();
+  else { const c = R.dlg.choices[Number(t.dataset.dlg)]; const done = R.dlg.onDone; closeDialog(); c.fn?.(); done?.(); }
+});
+
+// ---------- Ông Tư và nhiệm vụ mở đầu ----------
+const OLD_TU = { name: 'Ông Tư', x: 250, look: { skin: '#E0AC80', hair: '#DDD', long: false, hat: 3, capColor: '#2E2E33', shirt: '#E9EEF5', pants: '#3A3A40', scale: 1.1, glasses: true } };
+const QUEST_TEXT = {
+  meet: 'Đi tới chỗ <b>Ông Tư</b> bên trái để chào hỏi',
+  buy: 'Ra <b>Chợ đầu mối</b> nhập hàng (đi bộ sang trái, xe buýt hoặc xe máy)',
+  stock: 'Tới <b>Khu phố 1</b>, bấm vào gian số 1 để bày hàng',
+  collect: 'Chờ khách mua rồi bấm <b>đồng xu</b> trên gian để thu tiền',
+};
+function talkOldTu() {
+  if (S.quest === 'meet') {
+    talk(OLD_TU.name, OLD_TU.look, [
+      'Ê ê, nhỏ mới dọn về hẻm 42 hả? Nhìn cái mặt sáng sủa vầy chắc sắp làm <b>Vua Vỉa Hè</b>… hoặc vua nợ nần, hehe.',
+      'Tui bán đất cả đời mà chưa bán được miếng nào, nên tui <i>rành</i> chuyện buôn bán lắm à nghen!',
+      'Nghe nè: muốn bán thì phải có hàng. Ra <b>Chợ đầu mối</b> gom hàng sỉ trước đã, đi bộ qua bên trái là tới.',
+      'Có hàng rồi thì lên <b>Khu phố 1</b> bày ra gian mà bán. Nhớ né công an phường với mấy anh "bảo kê" nha.',
+      'Đi bộ cho khỏe, đón <b>xe buýt</b> ở trạm, hay leo lên con <b>xe máy</b> cà tàng dưới đường cũng được. Xăng tự đổ nha, tui không cho mượn đâu!',
+    ], { onDone: () => { S.quest = 'buy'; addXp(5); news('Ông Tư chỉ đường: nhập hàng ở chợ đầu mối rồi lên khu phố bán.', 'good'); save(); } });
+    return;
+  }
+  const banter = ['Bữa nay bán đắt hông? Đắt thì khao tui ly trà đá nghen.', 'Thấy chưa, nghe lời tui là có ngày giàu. Hồi đó tui không nghe lời tui nên giờ vầy nè.',
+    'Mấy ông bảo kê mà tới là cứ nói quen Ông Tư. Họ không biết tui đâu, nhưng nói cho oai.', 'Đất này vàng đó nghen, tui để giá hữu nghị: rẻ hơn hôm qua… một chút xíu.'];
+  talk(OLD_TU.name, OLD_TU.look, [pick(banter)], { choices: [
+    { label: 'Hỏi mua đất (Khu phố 2)', fn: () => openModal('Ông Tư bán đất', street2HTML(), { kind: 'street2' }) },
+    { label: 'Thôi', fn: null },
+  ] });
+}
+function questProgress(ev) {
+  const q = S.quest;
+  if (q === 'buy' && ev === 'buy') { S.quest = 'stock'; toast('Có hàng trong kho rồi! Giờ tới <b>Khu phố 1</b> bày lên gian.', 'gold'); }
+  else if (q === 'stock' && ev === 'stock') { S.quest = 'collect'; toast('Bày xong! Chờ khách mua, thấy đồng xu là bấm thu tiền.', 'gold'); }
+  else if (q === 'collect' && ev === 'collect') {
+    S.quest = 'done'; S.money += 20000;
+    toast('Xong bài học vỡ lòng! Ông Tư lì xì <b>20.000đ</b>. Giờ tự lo nha, Vua Vỉa Hè tương lai!', 'gold');
+    news('Bạn hoàn thành nhiệm vụ mở đầu, nhận 20.000đ.', 'good');
+  }
+}
+function renderQuest() {
+  const el = $('quest');
+  if (!el) return;
+  const t = R.started && S.quest && S.quest !== 'done' ? QUEST_TEXT[S.quest] : '';
+  el.hidden = !t;
+  if (t && el.dataset.q !== S.quest) { el.dataset.q = S.quest; el.innerHTML = `<span class="lbl">Nhiệm vụ</span><span>${t}</span>`; }
+}
+const BUS_DRIVER = { skin: '#C68B5E', hair: '#1E1A1A', long: false, hat: 3, capColor: '#2E8B57', shirt: '#2E8B57', style: 'collar', pants: '#2F3E46' };
+
+function homeObjects(hits, layer) {
+  // Ông Tư ngồi chiếu, cạnh bảng bán đất
+  const o = OLD_TU;
+  layer.push({ y: 540, draw: () => {
+    ctx.fillStyle = '#E6CB85'; rr(ctx, o.x - 55, 530, 110, 24, 4); ctx.fill();
+    ctx.strokeStyle = 'rgba(120,90,40,.5)'; ctx.lineWidth = 1; ctx.beginPath(); for (let k = o.x - 50; k < o.x + 55; k += 8) { ctx.moveTo(k, 530); ctx.lineTo(k, 554); } ctx.stroke();
+    drawPerson(ctx, { x: o.x, y: 538, dir: 1, look: o.look, seated: true, moving: false, phase: 0 });
+    ctx.fillStyle = '#FFF4D6'; rr(ctx, o.x + 52, 452, 96, 34, 4); ctx.fill(); ctx.strokeStyle = '#231A14'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.strokeStyle = '#6B4F3A'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(o.x + 100, 486); ctx.lineTo(o.x + 100, 536); ctx.stroke();
+    signText(ctx, 'BÁN ĐẤT', o.x + 100, 468, 17, '#C0392B');
+    nameTag(ctx, o.name, o.x, 538 - 156, false, S.quest === 'meet' ? 'Bấm để nói chuyện' : 'Bán đất');
+  } });
+  if (S.quest === 'meet') exclaim(o.x, 538 - 196);
+  hits.push({ x: o.x - 70, y: 380, w: 230, h: 180, kind: 'oldman', pri: 2 });
+  // hàng thanh lý = kho của mình
+  layer.push({ y: 556, draw: () => {
+    ctx.fillStyle = '#C9A06A';
+    [[930, 548, 60, 40], [980, 540, 50, 48], [950, 512, 54, 36], [1020, 552, 44, 30]].forEach(([x, y, w, h]) => { ctx.fillRect(x, y, w, h); ctx.strokeStyle = 'rgba(35,26,20,.5)'; ctx.lineWidth = 1.5; ctx.strokeRect(x, y, w, h); ctx.beginPath(); ctx.moveTo(x, y + h / 2); ctx.lineTo(x + w, y + h / 2); ctx.stroke(); });
+    ctx.fillStyle = '#FFF4D6'; rr(ctx, 942, 566, 80, 20, 3); ctx.fill();
+    signText(ctx, 'KHO HÀNG', 982, 575, 13, '#C0392B');
+  } });
+  hits.push({ x: 910, y: 480, w: 150, h: 115, kind: 'kho', pri: 2 });
+  // cửa nhà = tủ đồ
+  hits.push({ x: 590, y: 300, w: 100, h: 125, kind: 'door', pri: 2 });
+  // hộp thư = tin tức
+  layer.push({ y: 540, draw: () => {
+    ctx.fillStyle = '#1F6F8B'; rr(ctx, 858, 470, 34, 30, 4); ctx.fill(); ctx.fillStyle = '#6B4F3A'; ctx.fillRect(872, 500, 6, 40);
+    ctx.fillStyle = '#FFF4D6'; ctx.fillRect(864, 480, 22, 4);
+    if (R.unread) { ctx.fillStyle = '#D7372B'; ctx.beginPath(); ctx.arc(892, 468, 10, 0, 7); ctx.fill(); ctx.fillStyle = '#fff'; ctx.font = '800 12px "Baloo 2", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(Math.min(9, R.unread), 892, 469); }
+  } });
+  hits.push({ x: 848, y: 455, w: 56, h: 90, kind: 'mail', pri: 2 });
+}
+function drawParkingSign(hits) {
+  const x = 210, y = 560;
+  ctx.strokeStyle = '#6E6A64'; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y + 50); ctx.stroke();
+  ctx.fillStyle = '#1F6F8B'; rr(ctx, x - 70, y - 40, 140, 44, 8); ctx.fill(); ctx.strokeStyle = '#FFF4D6'; ctx.lineWidth = 2.5; ctx.stroke();
+  signText(ctx, 'BÃI XE · TRẠM BUÝT', x, y - 18, 14, '#FFF4D6', 128);
+  hits.push({ x: x - 76, y: y - 46, w: 152, h: 100, kind: 'parking', pri: 3 });
+}
+
 // ---------- Nhà riêng ----------
 function drawHomeFront(g, lights) {
   // nhà mình: nhà một tầng sơn xanh, mái đỏ, cổng sắt, dàn hoa
@@ -1440,46 +1715,19 @@ function drawHomeFront(g, lights) {
   g.fillStyle = '#F7B32B'; g.beginPath(); g.arc(x0 + 210, top + 118, 10, 0, 7); g.fill();
   g.fillStyle = '#8C6A4A'; rr(g, x0 + 150, GROUND - 60, 28, 24, 3); g.fill();
 }
-function homeObjects(hits) {
-  // ông Tư bán đất
-  const oldLook = { skin: '#E0AC80', hair: '#DDD', long: false, hat: 3, capColor: '#2E2E33', shirt: '#E9EEF5', pants: '#3A3A40', scale: 1.1, glasses: true };
-  ctx.fillStyle = '#E6CB85'; rr(ctx, 100, 540, 110, 24, 4); ctx.fill();
-  drawPerson(ctx, { x: 150, y: 548, dir: 1, look: oldLook, seated: true, moving: false, phase: 0 });
-  ctx.fillStyle = '#FFF4D6'; rr(ctx, 210, 452, 96, 34, 4); ctx.fill(); ctx.strokeStyle = '#231A14'; ctx.lineWidth = 2; ctx.stroke();
-  ctx.strokeStyle = '#6B4F3A'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(258, 486); ctx.lineTo(258, 540); ctx.stroke();
-  signText(ctx, 'BÁN ĐẤT', 258, 468, 17, '#C0392B');
-  nameTag(ctx, 'Ông Tư', 150, 548 - 150, false, 'Bán đất');
-  hits.push({ x: 90, y: 380, w: 230, h: 180, kind: 'land', pri: 2 });
-  // hàng thanh lý = kho của mình
-  ctx.fillStyle = '#C9A06A';
-  [[930, 548, 60, 40], [980, 540, 50, 48], [950, 512, 54, 36], [1020, 552, 44, 30]].forEach(([x, y, w, h]) => { ctx.fillRect(x, y, w, h); ctx.strokeStyle = 'rgba(35,26,20,.5)'; ctx.lineWidth = 1.5; ctx.strokeRect(x, y, w, h); ctx.beginPath(); ctx.moveTo(x, y + h / 2); ctx.lineTo(x + w, y + h / 2); ctx.stroke(); });
-  ctx.fillStyle = '#FFF4D6'; rr(ctx, 942, 566, 80, 20, 3); ctx.fill();
-  signText(ctx, 'KHO HÀNG', 982, 575, 13, '#C0392B');
-  hits.push({ x: 910, y: 480, w: 150, h: 115, kind: 'kho', pri: 2 });
-  // cửa nhà = tủ đồ
-  hits.push({ x: 590, y: 300, w: 100, h: 125, kind: 'door', pri: 2 });
-  // hộp thư = tin tức
-  ctx.fillStyle = '#1F6F8B'; rr(ctx, 360, 470, 34, 30, 4); ctx.fill(); ctx.fillStyle = '#6B4F3A'; ctx.fillRect(374, 500, 6, 40);
-  ctx.fillStyle = '#FFF4D6'; ctx.fillRect(366, 480, 22, 4);
-  if (R.unread) { ctx.fillStyle = '#D7372B'; ctx.beginPath(); ctx.arc(394, 468, 10, 0, 7); ctx.fill(); ctx.fillStyle = '#fff'; ctx.font = '800 12px "Baloo 2", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(Math.min(9, R.unread), 394, 469); }
-  hits.push({ x: 350, y: 455, w: 56, h: 90, kind: 'mail', pri: 2 });
-  // xe máy của mình dưới lòng đường
-  drawBike(ctx, { x: 760, y: 638, dir: 1, color: '#6BA368', parked: true, cargo: false });
-  ctx.fillStyle = '#D7372B'; rr(ctx, 716, 580, 34, 28, 4); ctx.fill(); ctx.strokeStyle = '#231A14'; ctx.lineWidth = 2; ctx.stroke();
-}
 function exclaim(x, y) {
   const b = Math.sin(R.t * 5) * 4;
   ctx.fillStyle = '#6BA368'; ctx.beginPath(); ctx.arc(x, y + b, 13, 0, 7); ctx.fill(); ctx.strokeStyle = '#231A14'; ctx.lineWidth = 2.5; ctx.stroke();
   ctx.fillStyle = '#fff'; ctx.font = '800 18px "Baloo 2", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('!', x, y + b + 1);
 }
 function drawPortal(p) {
-  const x = p.side < 0 ? 70 : worldW() - 70, y = 470;
+  const x = p.side < 0 ? 70 : worldW() - 70, y = p.y || 470;
   ctx.fillStyle = '#1F6F8B'; ctx.strokeStyle = '#FFF4D6'; ctx.lineWidth = 3;
   ctx.beginPath();
   if (p.side > 0) { ctx.moveTo(x - 70, y - 20); ctx.lineTo(x + 40, y - 20); ctx.lineTo(x + 62, y); ctx.lineTo(x + 40, y + 20); ctx.lineTo(x - 70, y + 20); }
   else { ctx.moveTo(x + 70, y - 20); ctx.lineTo(x - 40, y - 20); ctx.lineTo(x - 62, y); ctx.lineTo(x - 40, y + 20); ctx.lineTo(x + 70, y + 20); }
   ctx.closePath(); ctx.fill(); ctx.stroke();
-  ctx.strokeStyle = '#6E6A64'; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(x, y + 20); ctx.lineTo(x, FRONT_Y - 10); ctx.stroke();
+  ctx.strokeStyle = '#6E6A64'; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(x, y + 20); ctx.lineTo(x, Math.max(FRONT_Y - 10, y + 40)); ctx.stroke();
   signText(ctx, p.label, x + (p.side > 0 ? -8 : 8), y, 15, '#FFF4D6', 120);
   return { x: x - 75, y: y - 26, w: 150, h: 90, kind: 'portal', side: p.side, pri: 2 };
 }
@@ -1494,6 +1742,7 @@ function update(dt) {
     tickDebt();
     if (now() - S.pricesAt > 600000) { rollPrices(); news('Chợ đầu mối vừa đổi giá sỉ.'); }
     updatePolice(dt);
+    updateTrip(dt);
     if (!R.modal && !R.police) {
       R.nextThug -= dt;
       if (R.nextThug <= 0) { R.nextThug = rand(360, 600); if (S.level >= 2 && allGians().some(({ g }) => g.open)) startThug(); }
@@ -1829,13 +2078,8 @@ function onUiClick(e) {
   const go = t.dataset.go;
   if (go) {
     Snd.click();
-    if (go === 'home') enterView('home');
-    else if (go === 'kp0') { S.cur = 0; enterView('street'); }
-    else if (go === 'kp1') { if (S.streets.length < 2) openModal('Mở rộng làm ăn', street2HTML(), { kind: 'street2' }); else { S.cur = 1; enterView('street'); } }
-    else if (go === 'market') enterView('market');
-    else if (go === 'cafe') openCafe();
-    else if (go === 'fish') openPond();
-    else if (go === 'kho') openKho();
+    if (go === 'kho') openKho();
+    else if (!R.trip && !R.dlg) startTrip('bike', go);
     return;
   }
   const nav = t.dataset.nav;
@@ -1857,6 +2101,7 @@ $('modal-body').addEventListener('input', (e) => {
 });
 
 function updateHUD() {
+  renderQuest();
   const cb = document.querySelector('.coin-btn b');
   if (cb) cb.textContent = fmtK(S.streets[S.cur].gians.reduce((a, g) => a + g.cash, 0));
   $('money-val').textContent = fmt(S.money);
@@ -2395,6 +2640,7 @@ function bgIdNow() {
   return R.attract ? 'street_demo' : 'street_' + S.cur;
 }
 function render() {
+  if (R.trip?.phase === 'card') { drawTripCard(); R.hits = []; return; }
   const h = realHour();
   const bg = getBg(bgIdNow());
   const hits = [];
@@ -2462,11 +2708,11 @@ function render() {
     });
     for (const p of portalsFor()) { const hb = drawPortal(p); hits.push(hb); }
   } else if (R.view === 'home') {
-    homeObjects(hits);
+    homeObjects(hits, layer);
     for (const p of portalsFor()) hits.push(drawPortal(p));
   } else if (R.view === 'cafe') drawCafeScene(hits, layer);
   else if (R.view === 'fish') drawPondScene(hits);
-  else if (R.view === 'market') marketObjects(hits, layer);
+  else if (R.view === 'market') { marketObjects(hits, layer); drawParkingSign(hits); for (const p of portalsFor()) hits.push(drawPortal(p)); }
 
   if (R.view === 'street' && !R.attract) {
     people(R.buyers);
@@ -2480,8 +2726,7 @@ function render() {
     const b = nbBase(R.visit), ox = 420, oy = 548;
     layer.push({ y: oy, draw: () => { drawPerson(ctx, { x: ox, y: oy, dir: 1, look: { scale: 1.15, ...npcLook(R.visit) }, moving: false, phase: 0 }); nameTag(ctx, b.name, ox, oy - 172, false, 'Chủ nhà'); } });
   }
-  if (R.started && !R.attract && R.view !== 'fish' && R.view !== 'cafe') {
-    // (chợ, phố, nhà riêng: nhân vật đứng)
+  if (R.started && !R.attract && R.view !== 'fish' && R.view !== 'cafe' && !R.me.hidden) {
     const M = R.me;
     layer.push({ y: M.y, draw: () => {
       const sc = 1.2 * depthScale(M.y);
@@ -2494,6 +2739,7 @@ function render() {
   back.forEach((o) => o.draw());
   signs.forEach((f) => f());
   front.forEach((o) => o.draw());
+  if (R.view === 'home' || (R.view === 'street' && !R.attract)) drawVehicles(hits);
   if (R.view !== 'fish' && R.view !== 'cafe' && R.view !== 'market') for (const b of [...R.bikes].sort((a, b2) => a.y - b2.y)) drawBike(ctx, b);
   if (R.police?.phase === 'drive') drawTruck(ctx, R.police.x, 680);
 
@@ -2545,7 +2791,7 @@ function render() {
       hits.push({ x: cx - r - 8, y: y - r - 8, w: 2 * r + 16, h: 2 * r + 16, kind: 'cash', i, pri: 3 });
     }
   });
-  if (R.view === 'home') exclaim(640, 286);
+
   if (R.police?.stopped) bubble('Lập biên bản!', R.police.x + 120, 500, { size: 18, bg: '#F9C9C0' });
   // lời nói
   if (R.view === 'cafe') for (const s of R.cafeSeats || []) { const say = R.cafeSay[s.id]; if (say) bubble(say.text, s.x, s.top - 30, { size: 14, maxW: 260 }); }
@@ -2714,10 +2960,14 @@ function hitAt(p) {
 // đứng trước mặt gian để thao tác
 const frontOf = (i) => ({ x: gx(i) + (R.me.x < gx(i) ? -40 : 40), y: FRONT_Y });
 canvas.addEventListener('pointerdown', (e) => {
-  if (!R.started || R.modal) return;
+  if (!R.started || R.modal || R.dlg || R.trip) return;
   Snd.init();
   const p = toLogical(e);
   const h = hitAt(p);
+  const k = spotKey();
+  if (h && h.kind === 'bike' && k) { const sp = BIKE_SPOT[k]; walkTo(sp.x + 40, WALK_Y1 - 4, () => talk('Xe máy của bạn', playerLook(), ['Chạy xe đi đâu đây? Mỗi chuyến đổ 3.000đ tiền xăng.'], { choices: travelChoices('bike') })); return; }
+  if (h && h.kind === 'busstop' && k) { walkTo(BUS_STOP[k].x + 20, WALK_Y1 - 4, () => talk('Trạm xe buýt 52', BUS_DRIVER, ['Tuyến 52 ghé Nhà riêng, Chợ đầu mối và Khu phố. Vé 6.000đ một lượt.'], { choices: travelChoices('bus') })); return; }
+  if (h && h.kind === 'parking') { walkTo(210, 600, () => talk('Bãi giữ xe', BUS_DRIVER, ['Ra về bằng gì đây?'], { choices: [{ label: 'Chạy xe máy', sub: fmt(FUEL_COST), fn: () => talk('Xe máy của bạn', playerLook(), ['Chạy đi đâu?'], { choices: travelChoices('bike') }) }, { label: 'Đón xe buýt', sub: fmt(BUS_FARE), fn: () => talk('Trạm xe buýt 52', BUS_DRIVER, ['Đi đâu nè?'], { choices: travelChoices('bus') }) }, { label: 'Thôi', fn: null }] })); return; }
   const walkFloor = () => { if (p.y > GROUND + 4 || R.view === 'cafe') walkTo(p.x, p.y); };
   if (!h) { if (R.view !== 'fish') walkFloor(); return; }
   if (h.kind === 'portal') { const pt = portalsFor().find((q) => q.side === h.side); walkTo(h.x + h.w / 2, FRONT_Y + 10, () => pt?.go()); return; }
@@ -2736,9 +2986,9 @@ canvas.addEventListener('pointerdown', (e) => {
     else walkFloor();
   } else if (R.view === 'home') {
     if (h.kind === 'door') walkTo(640, WALK_Y0 + 4, openChar);
+    else if (h.kind === 'oldman') walkTo(OLD_TU.x + 70, 560, talkOldTu);
     else if (h.kind === 'kho') walkTo(900, 560, openKho);
     else if (h.kind === 'mail') walkTo(400, WALK_Y0 + 6, openNews);
-    else if (h.kind === 'land') walkTo(320, 560, () => openModal('Ông Tư bán đất', street2HTML(), { kind: 'street2' }));
     else walkFloor();
   } else if (R.view === 'cafe') {
     if (h.kind === 'cafe') { const s = (R.cafeSeats || []).find((q) => q.id === h.id); walkTo((s?.x ?? p.x) + 70, 596, () => openProfile(h.id)); }
@@ -2756,7 +3006,7 @@ canvas.addEventListener('pointerdown', (e) => {
 canvas.addEventListener('pointermove', (e) => {
   if (!R.started || R.modal) { R.hover = null; return; }
   const h = hitAt(toLogical(e));
-  R.hover = h && ['cash', 'trash', 'rat', 'chair', 'portal', 'kho', 'door', 'mail', 'land', 'mstall', 'board', 'boss', 'fun'].includes(h.kind) ? h : null;
+  R.hover = h && ['cash', 'trash', 'rat', 'chair', 'portal', 'kho', 'door', 'mail', 'oldman', 'bike', 'busstop', 'parking', 'mstall', 'board', 'boss', 'fun'].includes(h.kind) ? h : null;
   canvas.style.cursor = h && h.kind !== 'floor' ? 'pointer' : 'default';
 });
 const MOVE_KEYS = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'a', 'd', 'w', 's']);
@@ -2766,6 +3016,8 @@ window.addEventListener('keydown', (e) => {
   if (!R.started) return;
   if (e.target.tagName === 'INPUT') { if (e.key === 'Escape') e.target.blur(); return; }
   const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+  if (R.dlg) { if (e.code === 'Space' || e.key === 'Enter') { e.preventDefault(); dlgNext(); } else if (e.key === 'Escape' && R.dlg.choices) closeDialog(); return; }
+  if (R.trip) return;
   if (e.key === 'Escape') { if (!$('modal-close').hidden && R.modal) closeModal(); return; }
   if (e.code === 'Space') {
     e.preventDefault();
@@ -2776,9 +3028,9 @@ window.addEventListener('keydown', (e) => {
   }
   if (R.modal) return;
   if (MOVE_KEYS.has(key)) { e.preventDefault(); R.keys.add(key); return; }
-  if (key === 'c') enterView('market'); else if (key === 'k') openKho(); else if (key === 'x') openNeighbors();
-  else if (key === 'f') openCafe(); else if (key === 't') openChar(); else if (key === 'n') openNews();
-  else if (key === 'q') openPond(); else if (key === 'h') enterView('home');
+  if (key === 'c') startTrip('bike', 'market'); else if (key === 'k') openKho(); else if (key === 'x') openNeighbors();
+  else if (key === 'f') startTrip('bike', 'cafe'); else if (key === 't') openChar(); else if (key === 'n') openNews();
+  else if (key === 'q') startTrip('bike', 'fish'); else if (key === 'h') startTrip('bike', 'home');
   else if (/^[1-6]$/.test(key) && R.view === 'street') { const i = Number(key) - 1, f = frontOf(i); walkTo(f.x, f.y, () => openGian(S.cur, i)); }
 });
 $('btn-flee').addEventListener('click', flee);
@@ -2812,14 +3064,14 @@ window.addEventListener('resize', fit);
 // ---------- Khởi động ----------
 function beginGame(fresh) {
   Snd.init();
-  if (fresh) { S = freshState(); rollPrices(); R.unread = 0; news('Bạn vừa thuê được gian số 1 trong khu phố. Chúc buôn may bán đắt!', 'good'); }
+  if (fresh) { S = freshState(); rollPrices(); R.unread = 0; news('Bạn vừa dọn về hẻm 42, thuê được gian số 1 ở Khu phố 1.', 'good'); }
   R.attract = false; R.started = true;
-  R.parts = [];
-  enterView('street');
+  R.parts = []; R.trip = null; closeDialog();
+  enterView('home');
   $('title-screen').hidden = true;
   stage.classList.remove('on-title');
   renderDock(); updateHUD();
-  if (fresh) toast('Bấm xuống vỉa hè để đi lại (hoặc phím mũi tên / WASD). Gian số 1 đã bày sẵn kem chuối, thấy <b>đồng xu</b> hiện lên thì bấm để đi tới thu tiền.', 'gold');
+  if (fresh) toast('Bấm xuống vỉa hè để đi lại (hoặc phím mũi tên / WASD). Đi tới chỗ <b>Ông Tư</b> bên trái chào một tiếng đã.', 'gold');
   else if (R.offline) { toast(R.offline, 'gold'); R.offline = null; }
   save();
 }
