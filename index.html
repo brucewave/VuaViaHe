@@ -46,7 +46,7 @@
           </div>
           <div class="hud-group">
             <div class="pill place" id="place-val">Khu phố 1</div>
-            <div class="pill clock"><b id="clock-val">06:00</b><span id="debt-val">Không nợ</span></div>
+            <div class="pill clock" id="clock-pill"><b id="clock-val">06:00</b><span id="debt-val">Không nợ</span></div>
             <div id="topicons"></div>
             <button class="icon-btn" id="btn-sound" aria-label="Tắt tiếng" title="Bật/tắt tiếng">♪</button>
           </div>
@@ -60,6 +60,14 @@
           <p id="police-sub">Xe kiểm tra lấn chiếm vỉa hè đang tới. Gian nào chưa có giấy phép thì dẹp vô lẹ!</p>
           <button class="btn" id="btn-flee">Dẹp hàng vô! <kbd>Space</kbd></button>
           <div class="countdown"><i id="police-timer"></i></div>
+        </div>
+
+        <div id="fight-alert" role="alert" hidden>
+          <h3>ĐÁNH LẠI!</h3>
+          <p id="fight-sub">Bấm liên tục cho đủ số cú đấm trước khi hết giờ!</p>
+          <button class="btn" id="btn-fight">Đấm! <kbd>Space</kbd></button>
+          <div class="fight-meter"><i id="fight-power"></i><span id="fight-count"></span></div>
+          <div class="countdown"><i id="fight-timer"></i></div>
         </div>
 
         <div id="quest" class="pill quest" hidden aria-live="polite"></div>
