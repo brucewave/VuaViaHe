@@ -17,7 +17,7 @@ Mở `http://localhost:5173`. Game tự lưu trong trình duyệt (localStorage)
 - **Sạp chở trên xe máy**: bấm xe máy để mở tủ sạp, chọn sạp rồi chọn lô trống; một cô hoặc một anh bán hàng chạy ra đứng sạp và rao. Mỗi sạp có 6 ô hàng bán song song; nâng cấp gánh → xe đẩy → sạp gỗ → ki-ốt để mở thêm ô.
 - **Nhân vật** đi tự do trên vỉa hè (bấm chuột, phím mũi tên hoặc WASD). Bấm gian, đồng xu, rác thì nhân vật đi tới rồi mới làm.
 - **Chợ đầu mối**: 4 sạp mối hàng, bảng giá sỉ, Ông Chủ Mối cho mua chịu (nợ có lãi, quá hạn mức bị siết nợ).
-- **Nhà riêng**: tủ đồ, kho hàng, hộp thư, ông Tư bán đất (mua Khu phố 2).
+- **Nhà riêng**: tủ đồ, kho hàng, hộp thư, Ông Tư chỉ đường lúc mới chơi và cho thuê lô mới; xe máy, trạm xe buýt.
 - **Hàng xóm**: dọn giúp để thân, hoặc làm gian thương (chôm két, vứt rác, thả chuột).
 - **Công an phường** và **dân anh chị** đòi bảo kê.
 - **Hồ câu**: thả câu, phao chìm hẳn mới giật, 10 loại cá, sổ câu.
