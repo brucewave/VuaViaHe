@@ -13,7 +13,8 @@ Mở `http://localhost:5173`. Game tự lưu trong trình duyệt (localStorage)
 
 ## Lối chơi
 
-- **Khu phố** có 2 hàng lô trên vỉa hè (12 lô). Lô mở lần lượt từng ô: hàng 1, hàng 2, đủ Khu phố 1 mới sang Khu phố 2.
+- **10 khu phố**, mỗi khu một màn hình: phía sau là bờ tường thấp, vỉa hè sâu bày 2 hàng × 3 lô = 6 sạp, mặt đường rộng. Lô mở lần lượt từng ô (hàng 1 rồi hàng 2); thuê đủ 6 lô mới mở khu phố kế tiếp. KP5 và KP10 là phố VIP: dãy nhà lớn phía sau, bán nhanh hơn.
+- **Sự kiện trên đường**: xe chạy ngang xả rác lên vỉa hè; xe ba gác chở bia vấp ổ gà đổ hàng, có thể lụm (mất uy tín) hoặc phụ nhặt giùm (được bo, tăng uy tín).
 - **Sạp chở trên xe máy**: bấm xe máy để mở tủ sạp, chọn sạp rồi chọn lô trống; một cô hoặc một anh bán hàng chạy ra đứng sạp và rao. Mỗi sạp có 6 ô hàng bán song song; nâng cấp gánh → xe đẩy → sạp gỗ → ki-ốt để mở thêm ô.
 - **Nhân vật** đi tự do trên vỉa hè (bấm chuột, phím mũi tên hoặc WASD). Bấm gian, đồng xu, rác thì nhân vật đi tới rồi mới làm.
 - **Chợ đầu mối**: 4 sạp mối hàng, bảng giá sỉ, Ông Chủ Mối cho mua chịu (nợ có lãi, quá hạn mức bị siết nợ).
