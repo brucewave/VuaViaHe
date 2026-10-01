@@ -21,6 +21,7 @@ Mở `http://localhost:5173`. Game tự lưu trong trình duyệt (localStorage)
 - **Phố mặt tiền (KP5–KP10)**: phía sau là dãy nhà phố; 3 lô hàng 1 là tiệm cho thuê mặt bằng. Thuê rồi mở tiệm hớt tóc, sửa xe, cơm tấm, tạp hóa, điện thoại, cà phê, tiệm vàng — không cần nhập hàng, có nhân viên đứng tiệm, khách ra vào, thu nhập cao hơn sạp, nâng cấp tới cấp 5.
 - **Sự kiện trên đường**: xe chạy ngang xả rác lên vỉa hè; xe ba gác chở bia vấp ổ gà đổ hàng, có thể lụm (mất uy tín) hoặc phụ nhặt giùm (được bo, tăng uy tín).
 - **Bày sạp**: bấm vào lô trống để chọn sạp có sẵn hoặc mua sạp mới bày luôn; bấm thẳng vào sạp đang bày để bày hàng, nâng cấp, cất sạp; một cô hoặc một anh bán hàng chạy ra đứng sạp và rao. Mỗi sạp có 6 ô hàng bán song song; nâng cấp gánh → xe đẩy → sạp gỗ → ki-ốt để mở thêm ô.
+- **Nhân vật chính vẽ sẵn từng khung** (`public/sprites/hero.webp`, toạ độ ở `hero-sprite.js`): đứng chớp mắt, đi bộ, chạy khi bấm xa, câu cá ngồi ghế xếp, đấm đá lúc đánh dân anh chị, bị đánh gục khi thua, cúi nhặt khi tới nơi. Tắt được ở Bảng thử nghiệm để quay về dáng chibi cũ (dáng chibi vẫn đổi đồ theo tủ).
 - **Nhân vật** đi tự do trên vỉa hè (bấm chuột, phím mũi tên hoặc WASD). Bấm gian, đồng xu, rác thì nhân vật đi tới rồi mới làm.
 - **Chợ đầu mối**: 4 sạp mối hàng, bảng giá sỉ, Ông Chủ Mối cho mua chịu (quá hạn mức bị siết nợ).
 - **Nhà riêng**: tủ đồ, kho hàng, hộp thư, Ông Tư chỉ đường lúc mới chơi và cho thuê lô mới; xe máy.

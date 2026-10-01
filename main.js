@@ -3,6 +3,7 @@
 //  Lối chơi theo game Hàng Rong trên Zing Me: gian hàng trong khu phố,
 //  chợ đầu mối, hàng xóm, công an phường, dân anh chị, quán cà phê.
 // ================================================================
+import { HERO_FRAMES } from './hero-sprite.js';
 let W = 1280;            // bề rộng khung hình, co giãn theo màn hình
 const H = 720, SW = 1280; // SW: bề rộng các cảnh cố định (nhà, chợ, cà phê, hồ câu)
 const GROUND = 420;          // chân tường dãy nhà
@@ -916,6 +917,7 @@ function fightHit() {
   const F = R.fight;
   if (!F) return;
   F.hits++;
+  heroAct('attack', pick([[1, 2], [3, 4], [5, 6], [7, 8]]), 14);
   Snd.tone(180 + F.hits * 25, 0.07, 'square', 0.05);
   if (R.view !== 'fish') R.parts.push({ type: 'text', x: R.me.x + rand(-50, 50), y: R.me.y - 190 + rand(-20, 20), vy: -70, text: pick(['BỐP!', 'HỰ!', 'BINH!', 'CHÁT!', 'HÁ!']), color: '#FFE08A', life: 0.6, max: 0.6, small: true });
   if (F.hits >= F.need) endFight(true); else updateFightUI();
@@ -937,6 +939,7 @@ function endFight(win) {
     news(`Bạn không đóng tiền bảo kê, đánh đuổi được <b>${T.name}</b>.`, 'good');
     return;
   }
+  heroAct('hurt', [0, 1, 2, 3, 3, 4], 6, 1.6);
   const tgt = pick(allGians().filter(({ g }) => (g.placed || g.biz) && !g.broken));
   if (tgt) { tgt.g.broken = true; tgt.g.cash = 0; }
   Snd.bad();
@@ -1013,7 +1016,7 @@ function updateFish(dt) {
     if (F.t <= 0) { F.state = 'done'; toast('Chậm tay rồi, cá ăn mất mồi!', 'bad'); Snd.bad(); renderDock(); }
   } else if (F.state === 'reel') {
     F.t -= dt;
-    if (F.t <= 0) { F.state = 'done'; renderDock(); }
+    if (F.t <= 0) { F.state = 'done'; if (!FISH[F.catch.id].junk) heroAct('fish', [3], 1, 1.2); renderDock(); }
   }
   for (const r of R.ripples) { r.life -= dt; r.r += dt * 30; }
   R.ripples = R.ripples.filter((r) => r.life > 0);
@@ -1240,8 +1243,9 @@ function updateMe(dt) {
     M.phase += dt * 10;
   } else {
     M.moving = false;
-    if (M.then) { const f = M.then; M.then = null; f(); }
+    if (M.then) { const f = M.then; M.then = null; heroAct('pickup', [0, 1, 2], 9); f(); }
   }
+  updateHeroAct(dt);
   const target = camTarget();
   R.cam = target;
 }
@@ -2596,6 +2600,7 @@ function mockHTML() {
       ${b('police', 'Công an tới', 'Đứng ở khu phố', !onStreet)}${b('thug', 'Dân anh chị tới')}${b('spill', 'Xe đổ hàng', 'Đứng ở khu phố', !onStreet)}
       ${b('nb', 'Hàng xóm quậy')}${b('time', 'Tua 10 phút', 'Hàng bán như lúc vắng')}${b('auto', 'Bày tự động')}
       ${b('event', 'Sự kiện ngẫu nhiên', 'Đứng ở khu phố', !onStreet)}${b('tromcho', 'Trộm chó tới', 'Đứng ở khu phố', !onStreet)}${b('clock', 'Tua 6 giờ trong game', 'Xổ vé số, qua giờ khác')}${b('review', 'Khách góp ý', 'Thêm một góp ý mới')}${b('shopkp', 'Mở tới phố mặt tiền', 'Thuê KP1–KP5, cấp 15, +20 triệu')}
+      ${b('look', S.flags.oldLook ? 'Bật nhân vật vẽ sẵn' : 'Tắt nhân vật vẽ sẵn', S.flags.oldLook ? 'Đang dùng dáng chibi cũ' : 'Quay về dáng chibi cũ')}
       <button class="btn red" data-mock="reset">Xóa bản lưu, chơi lại</button>
     </div>`;
 }
@@ -2603,6 +2608,7 @@ function openMock() { openModal('Bảng thử nghiệm', mockHTML(), { kind: 'mo
 function onMockAct(act) {
   switch (act) {
     case 'load': loadMock(); return;
+    case 'look': S.flags.oldLook = !S.flags.oldLook; save(); refreshModal(); return;
     case 'money': S.money += 1000000; toast('+1.000.000đ', 'good'); break;
     case 'level': addXp(Math.max(1, xpNeed(S.level) - S.xp)); break;
     case 'energy': S.energy = energyMax(); toast('Sức đầy rồi.', 'good'); break;
@@ -2685,7 +2691,7 @@ function drawVehicles(hits) {
   const k = spotKey();
   const T = R.trip;
   const pl = playerLook();
-  const myBike = (x, y, riding) => drawBike(ctx, { x, y, dir: 1, color: '#6BA368', parked: !riding, rider: { skin: pl.skin, shirt: pl.shirt, helmet: '#D98E04' }, pass: null, cargo: false });
+  const myBike = (x, y, riding) => drawBike(ctx, { x, y, dir: 1, color: '#6BA368', parked: !riding, rider: { skin: pl.skin, shirt: heroOn() ? '#26262B' : pl.shirt, helmet: '#D98E04' }, pass: null, cargo: false });
   if (k) {
     const s = BIKE_SPOT[k];
     if (T && T.mode === 'bike' && T.phase !== 'card') myBike(T.x, T.y, true);
@@ -2707,7 +2713,8 @@ function drawTripCard() {
   ctx.fillStyle = '#E8C547'; for (let x = -off; x < W; x += 160) ctx.fillRect(x, 506, 80, 8);
   const cx = W / 2, bob = Math.sin(R.t * 18) * 2;
   const pl = playerLook();
-  if (T.mode === 'bike') drawBike(ctx, { x: cx, y: 560 + bob, dir: 1, color: '#6BA368', rider: { skin: pl.skin, shirt: pl.shirt, helmet: '#D98E04' }, pass: null, cargo: false });
+  if (T.mode === 'bike') drawBike(ctx, { x: cx, y: 560 + bob, dir: 1, color: '#6BA368', rider: { skin: pl.skin, shirt: heroOn() ? '#26262B' : pl.shirt, helmet: '#D98E04' }, pass: null, cargo: false });
+  else if (heroOn()) drawHero(ctx, cx, 560, 1.4, 1, 'walk', Math.floor(R.t * 11) % 8);
   else drawPerson(ctx, { x: cx, y: 560, dir: 1, look: { ...pl, scale: 1.4 }, moving: true, phase: R.t * 10 });
   const how = T.mode === 'bike' ? 'Đang chạy xe máy' : 'Đang đi bộ';
   ctx.fillStyle = 'rgba(35,26,20,.85)'; rr(ctx, cx - 260, 150, 520, 70, 16); ctx.fill();
@@ -3841,6 +3848,39 @@ function drawHat(g, L) {
     g.fillStyle = '#8B5A2B'; g.fillRect(-12, -125, 24, 3);
   }
 }
+// ---------- Nhân vật chính dạng khung hình vẽ sẵn ----------
+// Đứng, đi, chạy, câu cá, đánh nhau, bị đánh, tương tác. Tắt được ở Bảng thử nghiệm để quay về dáng chibi vẽ bằng code.
+const heroImg = new Image();
+heroImg.src = import.meta.env.BASE_URL + 'sprites/hero.webp';
+const HERO_K = 150 / 185;   // khung cao ~185px, dáng chibi cũ cao ~150
+const HERO_IDLE = [0, 1, 2, 3, 2, 1, 0, 0, 4, 5, 4, 0, 0, 1, 6, 6, 0, 0];
+const heroOn = () => !S.flags.oldLook && heroImg.complete && heroImg.naturalWidth > 0;
+// diễn một đoạn rồi trở lại dáng thường; hold: số giây giữ khung cuối
+function heroAct(anim, seq, fps, hold = 0) { R.me.act = { anim, seq, fps, hold, t: 0 }; }
+function updateHeroAct(dt) {
+  const A = R.me.act;
+  if (A && (A.t += dt) > A.seq.length / A.fps + A.hold) R.me.act = null;
+}
+// khung đang diễn: [anim, số khung]
+function heroPose(M) {
+  const A = M.act;
+  if (A) return [A.anim, A.seq[Math.min(Math.floor(A.t * A.fps), A.seq.length - 1)]];
+  if (R.fight) return ['attack', 0];
+  if (M.moving) {
+    const run = Math.hypot(M.tx - M.x, M.ty - M.y) > 320;
+    return run ? ['run', Math.floor(M.phase * 1.3) % 6] : ['walk', Math.floor(M.phase * 1.1) % 8];
+  }
+  return ['idle', HERO_IDLE[Math.floor(R.t * 5) % HERO_IDLE.length]];
+}
+function drawHero(g, x, y, s, dir, anim, k) {
+  const f = HERO_FRAMES[anim][k], sc = s * HERO_K;
+  g.save();
+  g.translate(x, y);
+  g.fillStyle = 'rgba(0,0,0,0.18)'; g.beginPath(); g.ellipse(0, 0, 24 * s, 6 * s, 0, 0, Math.PI * 2); g.fill();
+  g.scale(sc * (dir < 0 ? -1 : 1), sc);
+  g.drawImage(heroImg, f[0], f[1], f[2], f[3], -f[4], -f[5], f[2], f[3]);
+  g.restore();
+}
 // Nhân vật chính kiểu chibi (theo ảnh mẫu): đầu to, búi tóc, nón lá quai đỏ, áo bà ba nâu, quần ống rộng, dép.
 // Quay mặt sang phải, chân ở y = 0, cao ~150 kể cả nón; vẫn ăn theo đồ mặc trong tủ (màu áo, quần, nón, giày, phụ kiện).
 const CHIBI = { ol: '#3B2A20', skin: '#F6D7BE', hair: '#3A2A22', shirt: '#7E5538', pants: '#2F2420', straw: '#DDBF8E', strap: '#9A2E24', eye: '#4A2E1E', shoes: '#2A211B' };
@@ -4319,7 +4359,8 @@ function render() {
     const M = R.me;
     layer.push({ y: M.y, draw: () => {
       const sc = 1.2 * personBase() * depthScale(M.y);
-      drawPerson(ctx, { x: M.x, y: M.y, dir: M.dir, look: { ...playerLook(), scale: sc }, moving: M.moving, phase: M.phase });
+      if (heroOn()) drawHero(ctx, M.x, M.y, sc, M.dir, ...heroPose(M));
+      else drawPerson(ctx, { x: M.x, y: M.y, dir: M.dir, look: { ...playerLook(), scale: sc }, moving: M.moving, phase: M.phase });
       nameTag(ctx, S.player.name, M.x, M.y - 152 * sc, true, `Cấp ${S.level}`);
     } });
   }
@@ -4438,7 +4479,8 @@ function drawCafeScene(hits, layer) {
   const my = M.sit ? { x: M.sit.x, y: 540, seated: true } : { x: M.x, y: M.y, seated: false };
   const top = my.y - 150 * 1.2;
   layer.push({ y: M.sit ? 573 : M.y, draw: () => {
-    drawPerson(ctx, { x: my.x, y: my.y, dir: M.sit ? -1 : M.dir, look: { ...playerLook(), scale: 1.2 }, seated: my.seated, moving: M.moving, phase: M.phase });
+    if (heroOn() && !M.sit) drawHero(ctx, my.x, my.y, 1.2, M.dir, ...heroPose(M));
+    else drawPerson(ctx, { x: my.x, y: my.y, dir: M.sit ? -1 : M.dir, look: { ...playerLook(), scale: 1.2 }, seated: my.seated, moving: M.moving, phase: M.phase });
     nameTag(ctx, S.player.name, my.x, top, true, `${fmt(S.money)} · Cấp ${S.level}`);
   } });
   seats.push({ id: 'me', x: my.x, top: top - 24 });
@@ -4551,9 +4593,16 @@ function drawPondScene(hits) {
   ctx.strokeStyle = 'rgba(255,255,255,.6)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(otip.x, otip.y); ctx.quadraticCurveTo(1060, 340, 1040, ofy); ctx.stroke();
   drawFloat(1040, ofy, 0);
   // nhân vật của mình đứng đầu cầu
-  drawPerson(ctx, { x: POND_ME.x, y: POND_ME.y, dir: 1, look: playerLook(), moving: false, phase: 0, rod: true });
+  let tip = { x: POND_ME.x + 132, y: POND_ME.y - 216 };
+  if (heroOn()) {
+    // ngồi ghế xếp: cá rỉa / cá cắn thì cần cong xuống, kéo lên thì giật cần, câu được thì đứng dậy khoe
+    const reelK = F.state === 'reel' ? clamp(1 - F.t / 1.1, 0, 1) : 0;
+    const k = R.me.act?.anim === 'fish' ? R.me.act.seq[0] : F.state === 'bite' || F.nib > 0 || (F.state === 'cast' && F.t > 0.35) ? 1 : F.state === 'reel' ? (reelK > 0.6 && !FISH[F.catch?.id]?.junk ? 3 : 2) : 0;
+    const f = HERO_FRAMES.fish[k], sc = 1.1 * HERO_K;
+    drawHero(ctx, POND_ME.x, POND_ME.y, 1.1, 1, 'fish', k);
+    if (f[6] !== undefined) tip = { x: POND_ME.x + f[6] * sc, y: POND_ME.y + f[7] * sc };
+  } else drawPerson(ctx, { x: POND_ME.x, y: POND_ME.y, dir: 1, look: playerLook(), moving: false, phase: 0, rod: true });
   nameTag(ctx, S.player.name, POND_ME.x, POND_ME.y - 160, true);
-  const tip = { x: POND_ME.x + 132, y: POND_ME.y - 216 };
   if (F.state !== 'idle' && F.state !== 'reel') {
     const dip = F.state === 'bite' ? 12 : F.nib > 0 ? 5 : 0;
     const k = F.state === 'cast' ? clamp(1 - F.t / 0.7, 0, 1) : 1;
