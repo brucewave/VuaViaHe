@@ -20,10 +20,10 @@ Mở `http://localhost:5173`. Game tự lưu trong trình duyệt (localStorage)
 - **Chợ đầu mối**: chợ sớm 2h–6h giá sỉ rẻ hơn 10%. Ghé từng sạp mối để **trả giá** (bớt 5%, 10%, 20%, 30% mở theo cấp); trả hụt 3 lần thì mối giận, không bán tới đợt đổi giá sau. **Mua chịu** bị ghi thêm 10% tiền lời, nợ còn lãi 5% mỗi 5 phút.
 - **Phố mặt tiền (KP5–KP10)**: phía sau là dãy nhà phố; 3 lô hàng 1 là tiệm cho thuê mặt bằng. Thuê rồi mở tiệm hớt tóc, sửa xe, cơm tấm, tạp hóa, điện thoại, cà phê, tiệm vàng — không cần nhập hàng, có nhân viên đứng tiệm, khách ra vào, thu nhập cao hơn sạp, nâng cấp tới cấp 5.
 - **Sự kiện trên đường**: xe chạy ngang xả rác lên vỉa hè; xe ba gác chở bia vấp ổ gà đổ hàng, có thể lụm (mất uy tín) hoặc phụ nhặt giùm (được bo, tăng uy tín).
-- **Sạp chở trên xe máy**: bấm xe máy để mở tủ sạp, chọn sạp rồi chọn lô trống; một cô hoặc một anh bán hàng chạy ra đứng sạp và rao. Mỗi sạp có 6 ô hàng bán song song; nâng cấp gánh → xe đẩy → sạp gỗ → ki-ốt để mở thêm ô.
+- **Bày sạp**: bấm vào lô trống để chọn sạp có sẵn hoặc mua sạp mới bày luôn; bấm thẳng vào sạp đang bày để bày hàng, nâng cấp, cất sạp; một cô hoặc một anh bán hàng chạy ra đứng sạp và rao. Mỗi sạp có 6 ô hàng bán song song; nâng cấp gánh → xe đẩy → sạp gỗ → ki-ốt để mở thêm ô.
 - **Nhân vật** đi tự do trên vỉa hè (bấm chuột, phím mũi tên hoặc WASD). Bấm gian, đồng xu, rác thì nhân vật đi tới rồi mới làm.
 - **Chợ đầu mối**: 4 sạp mối hàng, bảng giá sỉ, Ông Chủ Mối cho mua chịu (quá hạn mức bị siết nợ).
-- **Nhà riêng**: tủ đồ, kho hàng, hộp thư, Ông Tư chỉ đường lúc mới chơi và cho thuê lô mới; xe máy, trạm xe buýt.
+- **Nhà riêng**: tủ đồ, kho hàng, hộp thư, Ông Tư chỉ đường lúc mới chơi và cho thuê lô mới; xe máy.
 - **Hàng xóm**: dọn giúp để thân, hoặc làm gian thương (chôm két, **chôm hàng trên sạp** về kho, vứt rác, thả chuột).
 - **Công an phường** và **dân anh chị** đòi bảo kê (có tiệm thì bị đòi nhiều hơn). Không đóng thì **đánh lại**: hiện nút "Đấm!" như lúc dẹp hàng né công an, bấm đủ số cú trong 5 giây (sức khỏe cao thì ít cú hơn), thua là bị đập sạp.
 - **Sự kiện nhỏ** cứ 1–2 phút một lần: thanh tra vệ sinh thực phẩm, khách ăn quỵt, YouTuber ẩm thực quay clip (bán ×2–×3), đoàn du khách (cả phố bán ×2), trời mưa (sạp không dù bán chậm), cô bán vé số, chó hoang tha hàng (bấm để đuổi), kẻ móc túi (bấm để bắt), **trộm chó** chạy xe máy thòng lọng chó hàng xóm (bấm vào xe để bắt, được thưởng).

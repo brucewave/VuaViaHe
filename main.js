@@ -267,7 +267,7 @@ const R = {
   cafeSay: {}, cafeT: 0,
   clouds: Array.from({ length: 6 }, () => ({ x: rand(0, W), y: rand(40, 200), s: rand(0.6, 1.4) })),
   stars: Array.from({ length: 60 }, () => ({ x: rand(0, W), y: rand(0, 300), r: rand(0.6, 1.6) })),
-  credit: false, unread: 0, runners: [], cries: {}, guests: [], actor: null, boost: null, rain: null, placing: null, bikeSel: null, bikePage: 0,
+  credit: false, unread: 0, runners: [], cries: {}, guests: [], actor: null, boost: null, rain: null, 
   fish: { state: 'idle', t: 0, fx: 780, fy: 560, nib: 0, catch: null },
   chat: [],
   ripples: [],
@@ -570,7 +570,7 @@ function rentGian(si, i) {
   if (S.money < cost) { toast(`Cần ${fmt(cost)} để thuê gian.`, 'bad'); return; }
   S.money -= cost; S.streets[si].gians[i].open = true;
   Snd.level();
-  toast(isShopLot(si, i) ? 'Thuê được mặt bằng! Chọn ngành nghề để khai trương.' : `Thuê được ${lotName(i)}! Bấm xe máy chọn sạp đem ra bày.`, 'gold');
+  toast(isShopLot(si, i) ? 'Thuê được mặt bằng! Chọn ngành nghề để khai trương.' : `Thuê được ${lotName(i)}! Bấm vào lô để chọn sạp đem ra bày.`, 'gold');
   news(`Bạn vừa thuê ${lotName(i)} ở khu phố ${si + 1}.`, 'good');
   closeModal();
   if (S.streets[si].gians.every((g) => g.open) && si + 1 < KP_COUNT) { toast(`Thuê đủ 6 lô ${kpLabel(si)}! <b>${kpLabel(si + 1)}</b> đã mở${isVip(si + 1) ? ', là phố mặt tiền: thuê được tiệm phía sau để làm ăn' : ''}.`, 'gold'); news(`${kpLabel(si + 1)} mở cửa cho bạn thuê lô.`, 'good'); }
@@ -1208,8 +1208,7 @@ function placeMe(x, y) {
 }
 function enterView(view, opts = {}) {
   R.view = view;
-  R.busOut = null;
-  R.placing = null; R.spill = null; R.actor = null; R.guests = [];
+  R.spill = null; R.actor = null; R.guests = [];
   if (view !== 'neighbor') R.visit = null;
   R.walkers = []; R.buyers = []; R.visitors = []; R.bikes = [];
   closeModal();
@@ -2391,7 +2390,7 @@ function drawRain() {
   ctx.fillStyle = 'rgba(40,50,70,.18)'; ctx.fillRect(R.cam, 0, W, H);
 }
 
-// ---------- Sạp mang theo trên xe máy ----------
+// ---------- Sạp: cất sẵn (S.bike) hoặc đang bày ngoài lô ----------
 const UNIT_FIELDS = ['stall', 'slots', 'du', 'ghe', 'bang', 'phep', 'broken', 'seller'];
 const UNIT_PRICE = (n) => Math.round((30000 * Math.pow(1.6, n)) / 1000) * 1000;
 const MAX_UNITS = 24;
@@ -2434,7 +2433,7 @@ function clearUnit(u) {
   }
   return n;
 }
-// đem sạp từ xe ra lô: người bán chạy từ chỗ xe tới lô rồi đứng rao
+// đem sạp đang cất ra lô: người bán chạy từ chỗ mình đứng tới lô rồi đứng rao
 function placeUnit(k, si, li) {
   const G = S.streets[si].gians[li];
   if (!G.open || G.placed) return;
@@ -2443,9 +2442,7 @@ function placeUnit(k, si, li) {
   if (!unitQty(u)) fillUnit(u, si);
   for (const f of UNIT_FIELDS) G[f] = u[f];
   G.placed = true; G.cash = 0; G.pausedUntil = 0; G.sellerAway = true;
-  R.placing = null;
-  const sp = BIKE_SPOT.street;
-  R.runners.push({ si, li, x: sp.x + 30, y: ST_WALK.y1 - 2, look: sellerLookFor(G.seller), name: G.seller.name, dir: 1, phase: 0, moving: true });
+  R.runners.push({ si, li, x: R.me.x, y: Math.min(R.me.y, ST_WALK.y1 - 2), look: sellerLookFor(G.seller), name: G.seller.name, dir: 1, phase: 0, moving: true });
   Snd.buy();
   toast(`${G.seller.name} ôm ${STALLS[G.stall].name.toLowerCase()} chạy ra ${lotName(li)}!`, 'good');
   if (!unitQty(G)) toast('Sạp chưa có hàng, kho cũng trống. Ra chợ đầu mối gom hàng đi!', 'bad');
@@ -2463,14 +2460,7 @@ function pickupUnit(si, li) {
   G.placed = false; G.slots = emptySlots(); G.stall = 'ganh'; G.du = G.ghe = G.bang = G.phep = G.broken = false; G.seller = null; G.sellerAway = false;
   R.runners = R.runners.filter((r) => !(r.si === si && r.li === li));
   delete R.cries[si + '-' + li];
-  Snd.click(); toast('Dọn sạp chất lên xe máy rồi.');
-}
-function startPlacing(k) {
-  if (R.view !== 'street') { toast('Lên khu phố rồi mới bày sạp được.', 'bad'); return; }
-  const free = S.streets[S.cur].gians.some((g, li) => g.open && !g.placed && !isShopLot(S.cur, li));
-  if (!free) { toast('Khu phố này hết lô trống. Thuê thêm lô hoặc thu bớt sạp về.', 'bad'); return; }
-  R.placing = k; closeModal(); closeDialog(); renderCtx();
-  toast('Bấm vào một <b>lô trống</b> (khung vàng) để bày sạp.', 'gold');
+  Snd.click(); toast('Đã cất sạp. Bấm lô trống nào cũng bày lại được.');
 }
 function updateRunners(dt) {
   for (const r of R.runners) {
@@ -2517,70 +2507,28 @@ function stallThumb(u) {
   drawStallFrame(g, { stall: u.stall, icons: icons.length ? Array.from({ length: 8 }, (_, k) => icons[k % icons.length]) : [], open: icons.length > 0, look: null, du: u.du, ghe: false, bang: false, label: icons.length > 1 ? 'TẠP HÓA' : icons.length ? GOODS[unitGoods(u)[0]].name.toUpperCase() : 'HÀNG RONG' });
   return (thumbCache[key] = c.toDataURL());
 }
-function bikeHTML() {
-  const sel = R.bikeSel ?? (S.bike.length ? 0 : null);
-  const page = R.bikePage || 0;
-  const items = S.bike.slice(page * 6, page * 6 + 6);
-  const cells = Array.from({ length: 6 }, (_, j) => {
-    const k = page * 6 + j, u = items[j];
-    if (!u) return `<div class="slot-cell empty"><small>Ô trống</small></div>`;
+// Bấm vào lô trống: chọn sạp đang cất để bày ra, hoặc mua sạp mới bày luôn
+function lotHTML(si, li) {
+  const n = totalUnits(), price = UNIT_PRICE(Math.max(0, n - 1)), full = n >= MAX_UNITS;
+  const cells = S.bike.map((u, k) => {
     const q = unitQty(u), cap = SLOT_OPEN[u.stall] * SLOT_CAP[u.stall];
-    return `<button class="slot-cell unit${sel === k ? ' sel' : ''}" data-unit="${k}"><img src="${stallThumb(u)}" alt="" /><b>${STALLS[u.stall].name}</b><span class="meter"><i style="width:${(q / cap) * 100}%"></i></span><small>${q}/${cap} món · ${u.seller.name}</small></button>`;
+    return `<button class="slot-cell unit" data-lotput="${k}"><img src="${stallThumb(u)}" alt="" /><b>${STALLS[u.stall].name}</b><span class="meter"><i style="width:${(q / cap) * 100}%"></i></span><small>${q}/${cap} món · ${u.seller.name}</small></button>`;
   }).join('');
-  const pages = Math.max(1, Math.ceil(S.bike.length / 6));
-  const u = sel != null ? S.bike[sel] : null;
-  const onStreet = R.view === 'street';
-  const nUnits = totalUnits(), price = UNIT_PRICE(nUnits - 1 < 0 ? 0 : nUnits - 1);
-  const next = u ? STALL_ORDER[STALL_ORDER.indexOf(u.stall) + 1] : null;
-  return `<div class="gian-panel">
-    <div class="cab-wrap">
-      ${pages > 1 ? `<div class="fun-tabs">${Array.from({ length: pages }, (_, p) => `<button class="fun-tab${p === page ? ' on' : ''}" data-bpage="${p}">Tủ ${p + 1}</button>`).join('')}</div>` : ''}
-      <div class="cabinet"><div class="cab-roof"></div><div class="cab-grid">${cells}</div></div>
-      <div class="cab-actions">
-        <button class="btn red" data-act="uclear" ${u && unitQty(u) ? '' : 'disabled'}>Bỏ hết hàng</button>
-        <button class="btn green" data-act="buymore">Mua hàng</button>
-        <button class="btn blue" data-act="uup" ${u && next && S.level >= STALLS[next].lvl && S.money >= STALLS[next].price ? '' : 'disabled'}>${next ? `Nâng cấp · ${fmtK(STALLS[next].price)}` : 'Nâng cấp'}</button>
-      </div>
-    </div>
-    <div class="gian-side">
-      <div class="gian-card">
-        <div class="kv"><span>Sạp trên xe</span><b>${S.bike.length}</b></div>
-        <div class="kv"><span>Đang bày ngoài phố</span><b>${allGians().filter(({ g }) => g.placed).length}</b></div>
-        <div class="kv"><span>Lô trống ở đây</span><b>${onStreet ? S.streets[S.cur].gians.filter((g, li) => g.open && !g.placed && !isShopLot(S.cur, li)).length : '—'}</b></div>
-        ${u ? `<div class="kv"><span>Người bán</span><b>${u.seller.name}</b></div>` : ''}
-      </div>
-      ${u ? `<button class="btn big" data-act="uplace" ${onStreet ? '' : 'disabled'}>Đem ra lô bán</button>
-        ${onStreet ? '' : '<small>Lên khu phố mới bày được. Bấm xe máy ở khu phố để chọn lô.</small>'}
-        <button class="btn paper" data-act="ufill" ${khoCount() ? '' : 'disabled'}>Bày đầy hàng từ kho</button>
-        ${next && S.level < STALLS[next].lvl ? `<small>Lên ${STALLS[next].name} cần cấp ${STALLS[next].lvl}.</small>` : ''}`
-        : '<p class="empty-note">Xe trống trơn. Mua sạp mới, hoặc thu sạp ngoài phố về.</p>'}
-      <button class="btn green" data-act="uauto" ${S.bike.length ? '' : 'disabled'}>Bày hết ra lô tự động</button>
-      <button class="btn paper" data-act="ubuy" ${S.money >= price && nUnits < MAX_UNITS ? '' : 'disabled'}>Mua gánh mới · ${fmt(price)}</button>
-    </div>
-  </div>`;
+  return `<p class="event-text">${lotName(li)[0].toUpperCase() + lotName(li).slice(1)} đang trống. Chọn một sạp có sẵn để bày ra đây, hoặc mua sạp mới. Người bán sẽ chạy ra rao hàng giùm bạn.</p>
+    ${S.bike.length ? `<p class="sec-title">Sạp có sẵn · ${S.bike.length}</p><div class="cab-grid lot-pick">${cells}</div>` : '<p class="empty-note">Chưa có sạp nào rảnh. Mua một đôi gánh mới để bày nha.</p>'}
+    <div class="btn-row"><button class="btn green" data-act="lotbuy" ${S.money >= price && !full ? '' : 'disabled'}>Mua gánh mới, bày ra đây · ${fmt(price)}</button>${full ? `<small>Đã đủ ${MAX_UNITS} sạp.</small>` : ''}</div>`;
 }
-function openBike() { if (R.bikeSel != null && R.bikeSel >= S.bike.length) R.bikeSel = null; openModal('Sạp trên xe máy', bikeHTML(), { kind: 'bike' }); }
-function onBikeAct(d) {
-  const sel = R.bikeSel ?? (S.bike.length ? 0 : null);
-  const u = sel != null ? S.bike[sel] : null;
-  if (d.unit !== undefined) { R.bikeSel = Number(d.unit); Snd.click(); return true; }
-  if (d.bpage !== undefined) { R.bikePage = Number(d.bpage); return true; }
-  switch (d.act) {
-    case 'uclear': if (u) { const n = clearUnit(u); if (n) toast(`Dọn ${n} món về kho.`); } return true;
-    case 'ufill': if (u) { const n = fillUnit(u); toast(n ? `Bày thêm ${n} món lên sạp.` : 'Sạp đầy hoặc kho trống.', n ? 'good' : ''); if (n) Snd.buy(); } return true;
-    case 'uup': if (u) { const next = STALL_ORDER[STALL_ORDER.indexOf(u.stall) + 1]; if (next && S.level >= STALLS[next].lvl && S.money >= STALLS[next].price) { S.money -= STALLS[next].price; u.stall = next; Snd.level(); toast(`Sạp lên đời ${STALLS[next].name}!`, 'gold'); } } return true;
-    case 'ubuy': { const n = totalUnits(), price = UNIT_PRICE(Math.max(0, n - 1)); if (S.money >= price && n < MAX_UNITS) { S.money -= price; S.bike.push(newUnit()); R.bikeSel = S.bike.length - 1; R.bikePage = Math.floor(R.bikeSel / 6); Snd.buy(); toast(`Mua thêm một đôi gánh, ${S.bike[R.bikeSel].seller.name} sẽ bán giùm.`, 'good'); } return true; }
-    case 'uplace': if (u) startPlacing(sel); return false;
-    case 'uauto': closeModal(); autoPlaceAll(); return false;
+function openLot(si, li) { openModal(`Lô trống · ${lotName(li)} · ${kpLabel(si)}`, lotHTML(si, li), { kind: 'lot', arg: [si, li] }); }
+function onLotAct(d, si, li) {
+  if (d.lotput !== undefined) { closeModal(); placeUnit(Number(d.lotput), si, li); return true; }
+  if (d.act === 'lotbuy') {
+    const n = totalUnits(), price = UNIT_PRICE(Math.max(0, n - 1));
+    if (S.money < price || n >= MAX_UNITS) return true;
+    S.money -= price; S.bike.push(newUnit());
+    closeModal(); placeUnit(S.bike.length - 1, si, li);
+    return true;
   }
-  return null;
-}
-function bikeMenu() {
-  talk('Xe máy của bạn', playerLook(), [`Trên xe đang chở ${S.bike.length} sạp. Làm gì đây?`], { choices: [
-    { label: 'Chọn sạp đem bán', fn: openBike },
-    { label: 'Chạy xe đi…', fn: () => talk('Xe máy của bạn', playerLook(), ['Chạy đi đâu? Mỗi chuyến 3.000đ tiền xăng.'], { choices: travelChoices('bike') }) },
-    { label: 'Thôi', fn: null },
-  ] });
+  return false;
 }
 
 // ---------- Bày tự động ----------
@@ -2675,10 +2623,9 @@ function onMockAct(act) {
   save(); refreshModal();
 }
 
-// ---------- Đi lại: xe máy, xe buýt, đi bộ ----------
-const FUEL_COST = 3000, BUS_FARE = 6000;
+// ---------- Đi lại: xe máy, đi bộ ----------
+const FUEL_COST = 3000;
 const BIKE_SPOT = { home: { x: 640, y: 654 }, street: { x: 110, y: 640 } };
-const BUS_STOP = { home: { x: 1120, y: 470 }, street: { x: 150, y: 498 } };
 const DEST_NAME = { home: 'Nhà riêng', market: 'Chợ đầu mối', cafe: 'Quán cà phê', fish: 'Hồ câu' };
 const destName = (d) => (d.startsWith('kp') ? kpLabel(Number(d.slice(2))) : DEST_NAME[d]);
 const curDest = () => (R.view === 'street' ? 'kp' + S.cur : R.view);
@@ -2690,94 +2637,50 @@ function goDest(d, opts = {}) {
   else if (d === 'cafe') openCafe();
   else if (d === 'fish') openPond();
 }
-function destsFor(mode) {
-  const all = ['home', ...Array.from({ length: KP_COUNT }, (_, k) => 'kp' + k).filter((d, k) => kpOpen(k)), 'market', ...(mode === 'bike' ? ['cafe', 'fish'] : [])];
+function destsFor() {
+  const all = ['home', ...Array.from({ length: KP_COUNT }, (_, k) => 'kp' + k).filter((d, k) => kpOpen(k)), 'market', 'cafe', 'fish'];
   return all.filter((d) => d !== curDest());
 }
-// mode: 'bike' | 'bus' | 'walk'
+// mode: 'bike' | 'walk'
 function startTrip(mode, dest) {
   if (R.trip || dest === curDest()) return;
   if (dest.startsWith('kp') && !kpOpen(Number(dest.slice(2)))) { const n = Number(dest.slice(2)); toast(`${kpLabel(n)} chưa mở. Thuê đủ 6 lô ${kpLabel(n - 1)} trước đã.`, 'bad'); return; }
-  const cost = mode === 'bike' ? FUEL_COST : mode === 'bus' ? BUS_FARE : 0;
-  if (S.money < cost) {
-    if (mode === 'bike') { toast('Hết tiền đổ xăng, đành đi bộ vậy!', 'bad'); mode = 'walk'; }
-    else { toast(`Không đủ ${fmt(cost)} mua vé xe buýt.`, 'bad'); return; }
-  }
-  const realCost = mode === 'bike' ? FUEL_COST : mode === 'bus' ? BUS_FARE : 0;
+  if (mode === 'bike' && S.money < FUEL_COST) { toast('Hết tiền đổ xăng, đành đi bộ vậy!', 'bad'); mode = 'walk'; }
+  const realCost = mode === 'bike' ? FUEL_COST : 0;
   S.money -= realCost; S.stats.food = (S.stats.food || 0) + realCost;
   closeDialog(); closeModal();
   const k = spotKey();
   const T = { mode, dest, phase: 'go', t: 0 };
   if (mode === 'bike' && k) { T.x = BIKE_SPOT[k].x; T.y = BIKE_SPOT[k].y; R.me.hidden = true; Snd.tone(180, 0.3, 'sawtooth', 0.03); }
-  else if (mode === 'bus' && k) { T.stop = BUS_STOP[k].x; T.busX = R.cam + W + 360; }
   else T.phase = 'card';
   R.trip = T; R.me.then = null; R.keys.clear();
 }
 function updateTrip(dt) {
-  if (R.busOut) { R.busOut.x -= dt * 480; if (R.busOut.x < R.cam - 420) R.busOut = null; }
   const T = R.trip;
   if (!T) return;
   T.t += dt;
   if (T.phase === 'go') {
-    if (T.mode === 'bike') {
-      if (T.t > 0.35) T.x += dt * (260 + (T.t - 0.35) * 1100);
-      if (T.x > R.cam + W + 160) { T.phase = 'card'; T.t = 0; }
-    } else {
-      if (!T.boarded) {
-        T.busX = Math.max(T.stop - 60, T.busX - dt * 820);
-        if (T.busX <= T.stop - 59) { T.wait = (T.wait || 0) + dt; if (T.wait > 0.35) { T.boarded = true; R.me.hidden = true; Snd.tone(500, 0.1, 'square', 0.03); } }
-      } else {
-        T.busX -= dt * (320 + (T.t * 520));
-        if (T.busX < R.cam - 420) { T.phase = 'card'; T.t = 0; }
-      }
-    }
+    if (T.t > 0.35) T.x += dt * (260 + (T.t - 0.35) * 1100);
+    if (T.x > R.cam + W + 160) { T.phase = 'card'; T.t = 0; }
   } else if (T.phase === 'card') {
     if (T.t > (T.mode === 'walk' ? 1.6 : 1.3)) {
       goDest(T.dest, { arrive: T.mode });
       const k = spotKey();
       T.phase = 'arrive'; T.t = 0;
       if (T.mode === 'bike' && k) { T.x = R.cam - 200; T.y = BIKE_SPOT[k].y; R.me.hidden = true; }
-      else if (T.mode === 'bus' && k) { T.stop = BUS_STOP[k].x; T.busX = R.cam + W + 360; T.boarded = true; R.me.hidden = true; T.dropped = false; }
       else { R.trip = null; R.me.hidden = false; arrivedMsg(T); }
     }
   } else if (T.phase === 'arrive') {
-    const k = spotKey();
-    if (T.mode === 'bike') {
-      const tx = BIKE_SPOT[k].x;
-      T.x = Math.min(tx, T.x + dt * Math.max(180, (tx - T.x) * 3));
-      if (T.x >= tx - 1) { placeMe(tx + 30, WALK_Y1 - 4); R.me.hidden = false; R.trip = null; arrivedMsg(T); }
-    } else {
-      if (!T.dropped) {
-        T.busX = Math.max(T.stop - 60, T.busX - dt * 820);
-        if (T.busX <= T.stop - 59) { T.wait = (T.wait || 0) + dt; if (T.wait > 0.3) { placeMe(T.stop, WALK_Y1 - 4); R.me.hidden = false; R.busOut = { x: T.busX }; R.trip = null; arrivedMsg(T); } }
-      }
-    }
+    const tx = BIKE_SPOT[spotKey()].x;
+    T.x = Math.min(tx, T.x + dt * Math.max(180, (tx - T.x) * 3));
+    if (T.x >= tx - 1) { placeMe(tx + 30, WALK_Y1 - 4); R.me.hidden = false; R.trip = null; arrivedMsg(T); }
   }
 }
 function arrivedMsg(T) {
-  const how = T.mode === 'bike' ? 'Chạy xe máy' : T.mode === 'bus' ? 'Đi xe buýt' : 'Đi bộ';
+  const how = T.mode === 'bike' ? 'Chạy xe máy' : 'Đi bộ';
   toast(`${how} tới ${destName(T.dest)}.${T.dest === 'market' && T.mode !== 'walk' ? ' Gửi xe ở bãi rồi đi bộ vô chợ.' : ''}`);
 }
-function drawBus(g, x, y, dir = -1) {
-  g.save(); g.translate(x, y); g.scale(-dir, 1);
-  g.fillStyle = 'rgba(0,0,0,.25)'; g.beginPath(); g.ellipse(150, 0, 160, 8, 0, 0, 7); g.fill();
-  g.fillStyle = '#2E8B57'; rr(g, 0, -150, 300, 132, 14); g.fill(); g.strokeStyle = '#231A14'; g.lineWidth = 3; g.stroke();
-  g.fillStyle = '#F2F2EE'; g.fillRect(0, -64, 300, 10);
-  g.fillStyle = '#BFD9E6'; for (let k = 0; k < 6; k++) g.fillRect(14 + k * 42, -130, 34, 44);
-  g.fillStyle = '#E8C547'; rr(g, 230, -146, 62, 18, 4); g.fill();
-  g.fillStyle = '#231A14'; g.font = '800 13px "Baloo 2", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('BUÝT 52', 261, -136);
-  g.fillStyle = '#1F5C3E'; g.fillRect(262, -122, 30, 92);
-  wheel(g, 60, -18, 20, R.t * 6); wheel(g, 240, -18, 20, R.t * 6);
-  g.restore();
-}
-function drawBusStop(g, x, y = 470) {
-  g.fillStyle = '#6E6A64'; g.fillRect(x - 3, y, 6, 636 - y);
-  g.fillStyle = '#1F6F8B'; rr(g, x - 46, y - 26, 92, 40, 6); g.fill(); g.strokeStyle = '#FFF4D6'; g.lineWidth = 2.5; g.stroke();
-  g.fillStyle = '#FFF4D6'; g.font = '800 13px "Baloo 2", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-  g.fillText('TRẠM', x, y - 14); g.fillText('XE BUÝT', x, y + 2);
-  if (y < 520) { g.fillStyle = '#8C6A4A'; g.fillRect(x + 14, 600, 70, 8); g.fillRect(x + 18, 608, 6, 16); g.fillRect(x + 74, 608, 6, 16); }
-}
-// vẽ xe của mình đang dựng, xe đang chạy, xe buýt của chuyến đi
+// vẽ xe của mình đang dựng hoặc đang chạy
 function drawVehicles(hits) {
   const k = spotKey();
   const T = R.trip;
@@ -2791,11 +2694,6 @@ function drawVehicles(hits) {
       ctx.fillStyle = '#D7372B'; rr(ctx, s.x - 52, s.y - 62, 32, 26, 4); ctx.fill(); ctx.strokeStyle = '#231A14'; ctx.lineWidth = 2; ctx.stroke();
       hits.push({ x: s.x - 60, y: s.y - 80, w: 120, h: 84, kind: 'bike', pri: 3 });
     }
-    const bs = BUS_STOP[k];
-    drawBusStop(ctx, bs.x, bs.y);
-    hits.push({ x: bs.x - 50, y: bs.y - 30, w: 100, h: 640 - (bs.y - 30), kind: 'busstop', pri: 2 });
-    if (T && T.mode === 'bus' && T.phase !== 'card') drawBus(ctx, T.busX, 660);
-    if (R.busOut) drawBus(ctx, R.busOut.x, 660);
   }
 }
 function drawTripCard() {
@@ -2810,16 +2708,13 @@ function drawTripCard() {
   const cx = W / 2, bob = Math.sin(R.t * 18) * 2;
   const pl = playerLook();
   if (T.mode === 'bike') drawBike(ctx, { x: cx, y: 560 + bob, dir: 1, color: '#6BA368', rider: { skin: pl.skin, shirt: pl.shirt, helmet: '#D98E04' }, pass: null, cargo: false });
-  else if (T.mode === 'bus') drawBus(ctx, cx + 150, 570 + bob, 1);
   else drawPerson(ctx, { x: cx, y: 560, dir: 1, look: { ...pl, scale: 1.4 }, moving: true, phase: R.t * 10 });
-  const how = T.mode === 'bike' ? 'Đang chạy xe máy' : T.mode === 'bus' ? 'Đang đi xe buýt' : 'Đang đi bộ';
+  const how = T.mode === 'bike' ? 'Đang chạy xe máy' : 'Đang đi bộ';
   ctx.fillStyle = 'rgba(35,26,20,.85)'; rr(ctx, cx - 260, 150, 520, 70, 16); ctx.fill();
   signText(ctx, `${how} tới ${destName(T.dest)}…`, cx, 184, 30, '#FFE08A', 490);
 }
-function travelChoices(mode) {
-  const cost = mode === 'bike' ? FUEL_COST : BUS_FARE;
-  const dests = mode === 'bike' ? destsFor('bike') : destsFor('bus');
-  return [...dests.map((d) => ({ label: destName(d), sub: fmt(cost), fn: () => startTrip(mode, d) })), { label: 'Thôi', fn: closeDialog }];
+function travelChoices() {
+  return [...destsFor().map((d) => ({ label: destName(d), sub: fmt(FUEL_COST), fn: () => startTrip('bike', d) })), { label: 'Thôi', fn: closeDialog }];
 }
 
 // ---------- Hội thoại ----------
@@ -2865,8 +2760,8 @@ $('dialog').addEventListener('click', (e) => {
 const OLD_TU = { name: 'Ông Tư', x: 250, look: { skin: '#E0AC80', hair: '#DDD', long: false, hat: 3, capColor: '#2E2E33', shirt: '#E9EEF5', pants: '#3A3A40', scale: 1.1, glasses: true } };
 const QUEST_TEXT = {
   meet: 'Đi tới chỗ <b>Ông Tư</b> bên trái để chào hỏi',
-  buy: 'Ra <b>Chợ đầu mối</b> nhập hàng (đi bộ sang trái, xe buýt hoặc xe máy)',
-  place: 'Lên <b>Khu phố 1</b>, bấm <b>xe máy</b> chọn sạp rồi chọn lô để bày',
+  buy: 'Ra <b>Chợ đầu mối</b> nhập hàng (đi bộ sang trái hoặc chạy xe máy)',
+  place: 'Lên <b>Khu phố 1</b>, bấm vào <b>lô trống</b> để bày sạp',
   collect: 'Chờ khách mua rồi bấm <b>đồng xu</b> trên gian để thu tiền',
 };
 function talkOldTu() {
@@ -2875,8 +2770,8 @@ function talkOldTu() {
       'Ê ê, nhỏ mới dọn về hẻm 42 hả? Nhìn cái mặt sáng sủa vầy chắc sắp làm <b>Vua Vỉa Hè</b>… hoặc vua nợ nần, hehe.',
       'Tui bán đất cả đời mà chưa bán được miếng nào, nên tui <i>rành</i> chuyện buôn bán lắm à nghen!',
       'Nghe nè: muốn bán thì phải có hàng. Ra <b>Chợ đầu mối</b> gom hàng sỉ trước đã, đi bộ qua bên trái là tới.',
-      'Có hàng rồi thì lên <b>Khu phố 1</b>, bấm con xe máy chọn sạp, chọn lô. Có cô có chú chạy ra rao bán giùm. Nhớ né công an phường với mấy anh "bảo kê" nha.',
-      'Đi bộ cho khỏe, đón <b>xe buýt</b> ở trạm, hay leo lên con <b>xe máy</b> cà tàng dưới đường cũng được. Xăng tự đổ nha, tui không cho mượn đâu!',
+      'Có hàng rồi thì lên <b>Khu phố 1</b>, bấm vào lô trống là chọn sạp bày ra liền. Có cô có chú chạy ra rao bán giùm. Nhớ né công an phường với mấy anh "bảo kê" nha.',
+      'Đi bộ cho khỏe, hay leo lên con <b>xe máy</b> cà tàng dưới đường cũng được. Xăng tự đổ nha, tui không cho mượn đâu!',
     ], { onDone: () => { S.quest = 'buy'; addXp(5); news('Ông Tư chỉ đường: nhập hàng ở chợ đầu mối rồi lên khu phố bán.', 'good'); save(); } });
     return;
   }
@@ -2889,7 +2784,7 @@ function talkOldTu() {
 }
 function questProgress(ev) {
   const q = S.quest;
-  if (q === 'buy' && ev === 'buy') { S.quest = 'place'; toast('Có hàng trong kho rồi! Lên <b>Khu phố 1</b>, bấm xe máy chọn sạp đem ra bày.', 'gold'); }
+  if (q === 'buy' && ev === 'buy') { S.quest = 'place'; toast('Có hàng trong kho rồi! Lên <b>Khu phố 1</b>, bấm vào lô trống để bày sạp.', 'gold'); }
   else if (q === 'place' && ev === 'place') { S.quest = 'collect'; toast('Bày sạp xong! Người bán rao hàng giùm, thấy đồng xu là bấm thu tiền.', 'gold'); }
   else if (q === 'collect' && ev === 'collect') {
     S.quest = 'done'; S.money += 20000;
@@ -2904,7 +2799,7 @@ function renderQuest() {
   el.hidden = !t;
   if (t && el.dataset.q !== S.quest) { el.dataset.q = S.quest; el.innerHTML = `<span class="lbl">Nhiệm vụ</span><span>${t}</span>`; }
 }
-const BUS_DRIVER = { skin: '#C68B5E', hair: '#1E1A1A', long: false, hat: 3, capColor: '#2E8B57', shirt: '#2E8B57', style: 'collar', pants: '#2F3E46' };
+const PARK_GUARD = { skin: '#C68B5E', hair: '#1E1A1A', long: false, hat: 3, capColor: '#2E8B57', shirt: '#2E8B57', style: 'collar', pants: '#2F3E46' };
 
 function homeObjects(hits, layer) {
   // Ông Tư ngồi chiếu, cạnh bảng bán đất
@@ -3233,7 +3128,7 @@ function closeModal() {
 }
 const MODAL_HTML = { market: () => marketHTML(R.modalArg), debt: () => debtHTML(), fun: () => funHTML(), kho: () => khoHTML(), gian: () => gianHTML(...R.modalArg), neighbors: () => neighborsHTML(),
   fashion: () => fashionHTML(), news: () => newsHTML(), cafe: () => cafeHTML(), street2: () => street2HTML(),
-  fishshop: () => fishShopHTML(), veso: () => vesoHTML(), pickchar: () => pickCharHTML(), ach: () => achHTML(), reviews: () => reviewsHTML(), paper: () => paperHTML(), bike: () => bikeHTML(), mock: () => mockHTML(), basket: () => basketHTML(), book: () => bookHTML(), profile: () => profileHTML(R.modalArg), char: () => charHTML() };
+  fishshop: () => fishShopHTML(), veso: () => vesoHTML(), pickchar: () => pickCharHTML(), ach: () => achHTML(), reviews: () => reviewsHTML(), paper: () => paperHTML(), lot: () => lotHTML(...R.modalArg), mock: () => mockHTML(), basket: () => basketHTML(), book: () => bookHTML(), profile: () => profileHTML(R.modalArg), char: () => charHTML() };
 function refreshModal() {
   if (!R.modal || !MODAL_HTML[R.modal]) return;
   const b = $('modal-body');
@@ -3329,10 +3224,7 @@ function gianHTML(si, i) {
       <div class="btn-row"><button class="btn" data-act="rent" ${S.level < lvl || S.money < cost ? 'disabled' : ''}>Thuê ${lotName(i)}</button></div>`;
   }
   if (isShopLot(si, i)) return shopHTML(si, i);
-  if (!G.placed) {
-    return `<p class="event-text">${lotName(i)[0].toUpperCase() + lotName(i).slice(1)} đang trống. Bấm vào <b>xe máy</b> của bạn ở đầu phố, chọn một sạp rồi chọn lô này để bày. Người bán sẽ chạy ra rao hàng giùm bạn.</p>
-      <div class="btn-row"><button class="btn" data-act="openbike">Mở sạp trên xe</button></div>`;
-  }
+  if (!G.placed) return lotHTML(si, i);
   const open = slotsOpen(G), cap = slotCap(G);
   const cells = G.slots.map((s, k) => {
     if (k >= open) {
@@ -3380,7 +3272,7 @@ function gianHTML(si, i) {
         <button class="btn green" data-act="buymore">Mua hàng</button>
         <button class="btn blue${R.gianTab === 'up' ? ' on' : ''}" data-act="uptab">Nâng cấp</button>
       </div>
-      <button class="btn paper" data-act="pickup">Thu sạp về xe máy</button>
+      <button class="btn paper" data-act="pickup" ${S.bike.length + 1 > MAX_UNITS ? 'disabled' : ''}>Cất sạp, để trống lô</button>
     </div>
     <div class="gian-side">
       <div class="gian-card">
@@ -3452,7 +3344,7 @@ function street2HTML() {
 }
 function openGian(si, i) {
   const G = S.streets[si].gians[i];
-  if (G.open && !G.placed && !isShopLot(si, i) && R.placing != null && R.view === 'street') { placeUnit(R.placing, si, i); return; }
+  if (G.open && !G.placed && !isShopLot(si, i)) { openLot(si, i); return; }
   R.gianTab = 'hang';
   R.slotSel = G.open ? (G.slots.findIndex((sl, k) => k < slotsOpen(G) && !sl.qty) >= 0 ? G.slots.findIndex((sl, k) => k < slotsOpen(G) && !sl.qty) : null) : null;
   openModal(`${isShopLot(si, i) ? (G.biz ? SHOP_TYPES[G.biz].name : 'Mặt bằng') : 'Sạp'} · ${lotName(i)} · ${kpLabel(si)}`, gianHTML(si, i), { kind: 'gian', arg: [si, i] }); }
@@ -3474,8 +3366,8 @@ $('modal-body').addEventListener('click', (e) => {
   if (R.modal === 'fun') return onFunClick(d);
   if (R.modal === 'veso') return onVesoClick(d);
   if (R.modal === 'mock' && d.mock) return onMockAct(d.mock);
-  if (R.modal === 'bike') { const r = onBikeAct(d); if (r === true) refreshModal(); if (r !== null) return; }
   const [si, i] = Array.isArray(R.modalArg) ? R.modalArg : [];
+  if ((R.modal === 'lot' || R.modal === 'gian') && onLotAct(d, si, i)) return;
   if (d.buy) return addCart(d.buy, d.n);
   if (d.reply) { replyReview(Number(d.rid), d.reply); refreshModal(); renderTop(); return; }
   if (d.barg) { bargain(R.modalArg, Number(d.barg)); refreshModal(); return; }
@@ -3510,7 +3402,6 @@ $('modal-body').addEventListener('click', (e) => {
     case 'rent': rentGian(si, i); if (isShopLot(si, i) && S.streets[si].gians[i].open) { openGian(si, i); return; } if (!R.modal) return; break;
     case 'bizup': upgradeBiz(si, i); break;
     case 'bizclose': closeBiz(si, i); break;
-    case 'openbike': closeModal(); openBike(); return;
     case 'pickup': pickupUnit(si, i); closeModal(); return;
     case 'collect': collect(si, i); break;
     case 'unslot': if (unstockSlot(si, i, R.slotSel)) Snd.click(); break;
@@ -3558,12 +3449,10 @@ function renderTop() {
 function renderCtx() {
   const C = $('ctx');
   let html = '';
-  if (R.view === 'street' && R.placing != null) {
-    html = `<div class="ctx-card"><p class="ctx-note"><b>Chọn lô trống</b> (khung vàng nhấp nháy) để bày sạp. Bấm chỗ khác hoặc Esc để thôi.</p></div>`;
-  } else if (R.view === 'street') {
+  if (R.view === 'street') {
     const cash = S.streets[S.cur].gians.reduce((a, g) => a + g.cash, 0);
     const T = kpTheme(S.cur);
-    html = `<div class="ctx-card theme-card" title="${esc(themeLine(S.cur))}"><b>${themeIcons(S.cur)} Gu ${T.tag.toLowerCase()}</b><small>${T.bonus === 'price' ? 'Bán giá ×2' : 'Khách mua ×2'} · đông ${hoursText(T.peak)}</small></div><button class="btn green auto-btn" data-nav="autoplace" title="Đem hết sạp trên xe ra lô trống và châm đầy hàng từ kho">Bày tự động<kbd>B</kbd></button><button class="btn coin-btn" data-nav="collect"><span>Thu tiền</span><b>${fmtK(cash)}</b><kbd>Space</kbd></button>`;
+    html = `<div class="ctx-card theme-card" title="${esc(themeLine(S.cur))}"><b>${themeIcons(S.cur)} Gu ${T.tag.toLowerCase()}</b><small>${T.bonus === 'price' ? 'Bán giá ×2' : 'Khách mua ×2'} · đông ${hoursText(T.peak)}</small></div><button class="btn green auto-btn" data-nav="autoplace" title="Đem hết sạp đang cất ra lô trống và châm đầy hàng từ kho">Bày tự động<kbd>B</kbd></button><button class="btn coin-btn" data-nav="collect"><span>Thu tiền</span><b>${fmtK(cash)}</b><kbd>Space</kbd></button>`;
   } else if (R.view === 'neighbor') {
     const tools = [['hand', 'Tay không', 'Dọn giúp · chôm két'], ['goods', 'Chôm hàng', '3 sức'], ['trash', 'Vứt rác', '2 sức'], ['rat', 'Thả chuột', '3 sức']];
     html = `<div class="ctx-card"><div class="tools">${tools.map(([k, n, s]) => `<button class="tool${R.tool === k ? ' on' : ''}" data-tool="${k}">${n}<small>${s}</small></button>`).join('')}</div>
@@ -4357,12 +4246,12 @@ function render() {
       }
       // lô đã thuê, chưa bày sạp: kẻ vạch trên vỉa hè
       if (!G.placed) {
-        const glow = R.placing != null ? 0.55 + Math.sin(R.t * 6) * 0.25 : 0;
+        const hov = R.hover && R.hover.kind === 'lot' && R.hover.i === i;
         layer.push({ y: base - 60, draw: () => {
-          if (glow) { ctx.fillStyle = `rgba(237,194,94,${glow * 0.45})`; rr(ctx, cx - 105, base - 62, 210, 68, 10); ctx.fill(); }
-          ctx.strokeStyle = glow ? '#EDC25E' : 'rgba(255,244,214,.8)'; ctx.lineWidth = glow ? 4 : 3; ctx.setLineDash([12, 8]);
+          if (hov) { ctx.fillStyle = 'rgba(237,194,94,.3)'; rr(ctx, cx - 105, base - 62, 210, 68, 10); ctx.fill(); }
+          ctx.strokeStyle = hov ? '#EDC25E' : 'rgba(255,244,214,.8)'; ctx.lineWidth = hov ? 4 : 3; ctx.setLineDash([12, 8]);
           rr(ctx, cx - 105, base - 62, 210, 68, 10); ctx.stroke(); ctx.setLineDash([]);
-          signText(ctx, glow ? 'BÀY Ở ĐÂY' : `LÔ ${i + 1} · TRỐNG`, cx, base - 28, glow ? 20 : 15, glow ? '#231A14' : 'rgba(255,244,214,.9)');
+          signText(ctx, hov ? '+ BÀY SẠP' : `LÔ ${i + 1} · TRỐNG`, cx, base - 28, hov ? 20 : 15, hov ? '#231A14' : 'rgba(255,244,214,.9)');
         } });
         if (mine) hits.push({ x: cx - 110, y: base - 72, w: 220, h: 82, kind: 'lot', i, pri: 1 });
         return;
@@ -4705,14 +4594,12 @@ canvas.addEventListener('pointerdown', (e) => {
   const p = toLogical(e);
   const h = hitAt(p);
   const k = spotKey();
-  if (h && h.kind === 'bike' && k) { const sp = BIKE_SPOT[k]; walkTo(sp.x + 40, WALK_Y1 - 4, bikeMenu); return; }
-  if (h && h.kind === 'busstop' && k) { walkTo(BUS_STOP[k].x + 20, WALK_Y1 - 4, () => talk('Trạm xe buýt 52', BUS_DRIVER, ['Tuyến 52 ghé Nhà riêng, Chợ đầu mối và Khu phố. Vé 6.000đ một lượt.'], { choices: travelChoices('bus') })); return; }
+  if (h && h.kind === 'bike' && k) { const sp = BIKE_SPOT[k]; walkTo(sp.x + 40, WALK_Y1 - 4, () => talk('Xe máy của bạn', playerLook(), [`Chạy đi đâu? Mỗi chuyến ${fmt(FUEL_COST)} tiền xăng.`], { choices: travelChoices() })); return; }
   if (h && h.kind === 'actor') { catchActor(); return; }
   if (h && h.kind === 'spill') { const it = h.item; walkTo(it.x, walkBand().y1, () => pickSpill(it)); return; }
   if (h && h.kind === 'driver') { walkTo(R.spill.x + 120, walkBand().y1, () => R.spill && talk('Chú ba gác', { skin: '#C68B5E', hair: '#1E1A1A', long: false, hat: 2, helmet: '#F7B32B', shirt: '#3E7CB1', pants: '#2F3E46' }, ['Trời ơi vấp cái ổ gà, đổ hết bia rồi! Phụ chú nhặt với con ơi!'], { choices: [{ label: 'Phụ nhặt giùm', sub: '2 sức', fn: helpSpill }, { label: 'Thôi', fn: null }] })); return; }
-  if (h && h.kind === 'parking') { walkTo(210, 600, () => talk('Bãi giữ xe', BUS_DRIVER, ['Ra về bằng gì đây?'], { choices: [{ label: 'Chạy xe máy', sub: fmt(FUEL_COST), fn: () => talk('Xe máy của bạn', playerLook(), ['Chạy đi đâu?'], { choices: travelChoices('bike') }) }, { label: 'Đón xe buýt', sub: fmt(BUS_FARE), fn: () => talk('Trạm xe buýt 52', BUS_DRIVER, ['Đi đâu nè?'], { choices: travelChoices('bus') }) }, { label: 'Thôi', fn: null }] })); return; }
+  if (h && h.kind === 'parking') { walkTo(210, 600, () => talk('Bãi giữ xe', PARK_GUARD, ['Lấy xe chạy đi đâu nè?'], { choices: travelChoices() })); return; }
   const walkFloor = () => { if (p.y > walkBand().y0 - 40 || R.view === 'cafe') walkTo(p.x, p.y); };
-  if (R.placing != null && (!h || h.kind !== 'lot')) { R.placing = null; renderCtx(); toast('Thôi không bày nữa.'); if (!h) return; }
   if (!h) { if (R.view !== 'fish') walkFloor(); return; }
   if (h.kind === 'portal') { const pt = portalsFor().find((q) => q.side === h.side); walkTo(h.x + h.w / 2, FRONT_Y + 10, () => pt?.go()); return; }
   if (R.view === 'street') {
@@ -4721,7 +4608,7 @@ canvas.addEventListener('pointerdown', (e) => {
     else if (h.kind === 'trash') walkTo(h.wx, h.wy, () => cleanTrash(S.cur, i));
     else if (h.kind === 'rat') walkTo(h.wx, h.wy, () => chaseRat(S.cur, i));
     else if (h.kind === 'visitor') { const v = R.visitors.find((q) => q.id === h.id); walkTo((v?.x ?? p.x) - 60, v?.y ?? p.y, () => openProfile(h.id)); }
-    else if (h.kind === 'lot') { if (R.placing != null) placeUnit(R.placing, S.cur, i); else { walkTo(p.x, p.y); if (!R.lotHintAt || now() - R.lotHintAt > 20000) { R.lotHintAt = now(); toast('Lô trống. Bấm <b>xe máy</b> ở đầu phố để chọn sạp đem ra bày.'); } } }
+    else if (h.kind === 'lot') walkTo(f.x, f.y, () => openLot(S.cur, i));
     else if (h.kind === 'gian') walkTo(f.x, f.y, () => openGian(S.cur, i));
     else walkFloor();
   } else if (R.view === 'neighbor') {
@@ -4753,7 +4640,7 @@ canvas.addEventListener('pointerdown', (e) => {
 canvas.addEventListener('pointermove', (e) => {
   if (!R.started || R.modal) { R.hover = null; return; }
   const h = hitAt(toLogical(e));
-  R.hover = h && ['cash', 'trash', 'rat', 'chair', 'portal', 'lot', 'spill', 'driver', 'actor', 'kho', 'door', 'mail', 'oldman', 'bike', 'busstop', 'parking', 'mstall', 'board', 'boss', 'fun', 'veso', 'kqboard'].includes(h.kind) ? h : null;
+  R.hover = h && ['cash', 'trash', 'rat', 'chair', 'portal', 'lot', 'spill', 'driver', 'actor', 'kho', 'door', 'mail', 'oldman', 'bike', 'parking', 'mstall', 'board', 'boss', 'fun', 'veso', 'kqboard'].includes(h.kind) ? h : null;
   canvas.style.cursor = h && h.kind !== 'floor' ? 'pointer' : 'default';
 });
 const MOVE_KEYS = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'a', 'd', 'w', 's']);
@@ -4766,7 +4653,7 @@ window.addEventListener('keydown', (e) => {
   if (R.fight) { if (e.code === 'Space' || e.key === 'Enter') { e.preventDefault(); if (!e.repeat) fightHit(); } return; }
   if (R.dlg) { if (e.code === 'Space' || e.key === 'Enter') { e.preventDefault(); dlgNext(); } else if (e.key === 'Escape' && R.dlg.choices) closeDialog(); return; }
   if (R.trip) return;
-  if (e.key === 'Escape') { if (R.placing != null) { R.placing = null; renderCtx(); return; } if (!$('modal-close').hidden && R.modal) closeModal(); return; }
+  if (e.key === 'Escape') { if (!$('modal-close').hidden && R.modal) closeModal(); return; }
   if (e.code === 'Space') {
     e.preventDefault();
     if (R.police?.phase === 'warn') flee();
