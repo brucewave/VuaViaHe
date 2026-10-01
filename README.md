@@ -13,7 +13,8 @@ Mở `http://localhost:5173`. Game tự lưu trong trình duyệt (localStorage)
 
 ## Lối chơi
 
-- **Khu phố** có 6 gian hàng. Mỗi gian là một tủ hàng 6 ô, mỗi ô bày một món và bán song song. Nâng cấp gánh → xe đẩy → sạp gỗ → ki-ốt để mở thêm ô.
+- **Khu phố** có 2 hàng lô trên vỉa hè (12 lô). Lô mở lần lượt từng ô: hàng 1, hàng 2, đủ Khu phố 1 mới sang Khu phố 2.
+- **Sạp chở trên xe máy**: bấm xe máy để mở tủ sạp, chọn sạp rồi chọn lô trống; một cô hoặc một anh bán hàng chạy ra đứng sạp và rao. Mỗi sạp có 6 ô hàng bán song song; nâng cấp gánh → xe đẩy → sạp gỗ → ki-ốt để mở thêm ô.
 - **Nhân vật** đi tự do trên vỉa hè (bấm chuột, phím mũi tên hoặc WASD). Bấm gian, đồng xu, rác thì nhân vật đi tới rồi mới làm.
 - **Chợ đầu mối**: 4 sạp mối hàng, bảng giá sỉ, Ông Chủ Mối cho mua chịu (nợ có lãi, quá hạn mức bị siết nợ).
 - **Nhà riêng**: tủ đồ, kho hàng, hộp thư, ông Tư bán đất (mua Khu phố 2).
