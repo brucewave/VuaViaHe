@@ -27,28 +27,28 @@
 
         <div id="hud">
           <div class="hud-group">
-            <div class="pill money" title="Tiền mặt"><img class="hi" src="/assets/ui/tien.png" alt="Tiền" /><b id="money-val">0đ</b></div>
+            <div class="pill money"><span class="lbl">Tiền</span><b id="money-val">0đ</b></div>
             <div class="pill level">
-              <span class="avatar"><canvas id="hud-face" width="96" height="96" aria-hidden="true"></canvas><span class="lvl-badge" id="level-val">1</span></span>
+              <span class="lvl-badge" id="level-val">1</span>
               <div class="lvl-info">
-                <span class="lvl-name" id="name-val">Bạn</span>
                 <span class="lvl-title" id="title-val">Người bán dạo</span>
                 <span class="bar"><i id="xp-bar"></i></span>
               </div>
             </div>
-            <div class="pill energy" id="energy-pill" title="Sức hồi 1 điểm mỗi 45 giây">
-              <img class="hi" src="/assets/ui/suc.png" alt="Sức" />
-              <span class="e-main"><span class="e-row"><span class="bar"><i id="energy-bar"></i></span><b id="energy-val">20</b></span><span class="e-next" id="energy-next"></span></span>
+            <div class="pill energy" id="energy-pill" title="Năng lượng hồi 1 điểm mỗi 45 giây">
+              <span class="lbl">Sức</span>
+              <span class="bar"><i id="energy-bar"></i></span>
+              <b id="energy-val">20</b>
             </div>
             <div class="pill karma" id="karma-pill" title="Uy tín tăng khi làm ăn đàng hoàng, giảm khi chơi xấu hàng xóm">
-              <img class="hi" src="/assets/ui/uy-tin.png" alt="" /><span class="lbl" id="karma-lbl">Uy tín</span><b id="karma-val">0</b>
+              <span class="lbl" id="karma-lbl">Uy tín</span><b id="karma-val">0</b>
             </div>
           </div>
           <div class="hud-group">
             <div class="pill place" id="place-val">Khu phố 1</div>
             <div class="pill clock"><b id="clock-val">06:00</b><span id="debt-val">Không nợ</span></div>
             <div id="topicons"></div>
-            <button class="top-ic" id="btn-settings" aria-label="Cài đặt" title="Cài đặt: âm thanh, bảng thử nghiệm"><img src="/assets/ui/cai-dat.png" alt="" /><em>Cài đặt</em></button>
+            <button class="icon-btn" id="btn-sound" aria-label="Tắt tiếng" title="Bật/tắt tiếng">♪</button>
           </div>
         </div>
 

@@ -35,9 +35,3 @@ Mở `http://localhost:5173`. Game tự lưu trong trình duyệt (localStorage)
 ## Chuẩn bị cho server
 
 Mọi thứ liên quan tới người chơi khác đi qua đối tượng `Net` trong `main.js` (hiện là `LocalNet`, chạy ngoại tuyến với hàng xóm do máy điều khiển). Khi có server, viết một đối tượng có cùng các hàm `myProfile`, `roomPlayers`, `sendChat`, `fetchStreet`, `streetAction` rồi gán cho `Net`.
-
-## Ảnh vẽ sẵn (asset)
-
-- Tờ gốc tạo bằng AI nằm ở `assets/raw/` (`icon.webp`, `duong-pho.webp`, `toa-nha.webp`).
-- `python tools/xuat_asset.py` cắt các tờ đó (xóa nền, tách từng hình), đặt tên rồi lưu vào `public/assets/ui`, `pho`, `nha`. Thay tờ mới thì sửa bảng `NAMES` trong script cho khớp số thứ tự mảnh (xem `_xem.png` do `tools/cat_asset.py` sinh ra).
-- Game tải ảnh lúc mở; ảnh nào thiếu thì chỗ đó vẫn vẽ bằng code như cũ.

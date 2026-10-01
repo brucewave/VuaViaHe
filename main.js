@@ -44,56 +44,6 @@ function hexRgb(h) { const n = parseInt(h.slice(1), 16); return [n >> 16, (n >> 
 function mixHex(a, b, t) { const A = hexRgb(a), B = hexRgb(b); return `rgb(${A.map((v, i) => Math.round(lerp(v, B[i], t))).join(',')})`; }
 function shade(hex, amt) { const [r, g, b] = hexRgb(hex); return `rgb(${clamp(r + amt, 0, 255)},${clamp(g + amt, 0, 255)},${clamp(b + amt, 0, 255)})`; }
 const EMOJI_FONT = '"Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif';
-// ---------- Ảnh vẽ sẵn (public/assets, cắt bằng tools/xuat_asset.py) ----------
-// Tải song song khi mở game; ảnh nào chưa tải xong hoặc lỗi thì chỗ đó vẽ kiểu cũ bằng code.
-const asset = (path) => `${import.meta.env.BASE_URL}assets/${path}`;
-const ASSETS = ['pho/le-gach', 'pho/duong-vach', 'pho/cay', 'pho/den-duong', 'pho/tru-nuoc', 'pho/chau-cay', 'pho/bon-hoa', 'pho/bui-hoa',
-  'pho/nap-ho-tron', 'pho/hang-rao', 'nha/shop', 'nha/cafe', 'nha/van-phong', 'nha/nha'];
-const IMG = {};
-function loadAssets() {
-  return Promise.all(ASSETS.map((k) => new Promise((ok) => {
-    const im = new Image();
-    im.onload = () => { IMG[k] = im; ok(); };
-    im.onerror = () => ok();
-    im.src = asset(k + '.png');
-  }))).then(() => { R.bgCache = {}; R.patCache = {}; });
-}
-// vẽ ảnh neo ở giữa chân (x, y), cao h px; trả về khung đã vẽ
-function drawImg(g, key, x, y, h) {
-  const im = IMG[key];
-  if (!im) return null;
-  const w = h * im.width / im.height;
-  g.drawImage(im, x - w / 2, y - h, w, h);
-  return { x: x - w / 2, y: y - h, w, h };
-}
-// mẫu lát lặp từ một vùng của ảnh (mặt gạch, lề, mặt đường)
-function imgPattern(g, key, sx, sy, sw, sh, scale) {
-  const id = `${key}:${sx},${sy},${sw},${sh}@${scale}`;
-  R.patCache ||= {};
-  if (!R.patCache[id]) {
-    const c = document.createElement('canvas');
-    c.width = Math.round(sw * scale); c.height = Math.round(sh * scale);
-    c.getContext('2d').drawImage(IMG[key], sx, sy, sw, sh, 0, 0, c.width, c.height);
-    R.patCache[id] = c;
-  }
-  return g.createPattern(R.patCache[id], 'repeat');
-}
-// vỉa hè lát gạch + bó vỉa + mặt đường nhựa từ ảnh; top: chân tường, curb: mép vỉa hè
-function paintGround(g, top, curb, BW, rnd) {
-  if (!IMG['pho/le-gach'] || !IMG['pho/duong-vach']) return false;
-  g.save(); g.translate(0, top); g.fillStyle = imgPattern(g, 'pho/le-gach', 24, 6, 212, 104, 0.62); g.fillRect(0, 0, BW, curb - top); g.restore();
-  g.fillStyle = 'rgba(0,0,0,.18)'; g.fillRect(0, top, BW, 6);
-  const ch = 22, cy = curb - 6;
-  g.save(); g.translate(0, cy); g.fillStyle = imgPattern(g, 'pho/le-gach', 24, 110, 212, 40, ch / 40); g.fillRect(0, 0, BW, ch); g.restore();
-  const ry = cy + ch;
-  g.save(); g.translate(0, ry); g.fillStyle = imgPattern(g, 'pho/duong-vach', 18, 24, 264, 174, 0.8); g.fillRect(0, 0, BW, H - ry); g.restore();
-  // nắp cống rải trên mặt đường
-  for (let i = 0; i < 2; i++) {
-    const im = IMG['pho/nap-ho-tron'];
-    if (im) g.drawImage(im, 120 + rnd() * (BW - 240), ry + 18 + rnd() * 20, 46, 22);
-  }
-  return true;
-}
 function emoji(g, ch, x, y, size) { g.font = `${size}px ${EMOJI_FONT}`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(ch, x, y); }
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
@@ -1555,10 +1505,6 @@ function drawWallBg(g, rnd, rp, lights, PM, si) {
   signText(g, `${kpLabel(si).toUpperCase()} · ${KP_NAMES[si].toUpperCase()}`, 445, wallTop - 37, 17, '#FFF4D6', 206);
 }
 function drawStreetGround(g, rnd, BW, wave) {
-  if (!wave && paintGround(g, ST_GROUND, ST_CURB, BW, rnd)) {
-    for (let i = 0; i < 3; i++) { g.fillStyle = 'rgba(20,20,24,.45)'; g.beginPath(); g.ellipse(rnd() * BW, 600 + rnd() * 40, 18 + rnd() * 10, 5, 0, 0, 7); g.fill(); }
-    return;
-  }
   g.fillStyle = wave ? '#E9E4D8' : '#CDBB9C'; g.fillRect(0, ST_GROUND, BW, ST_CURB - ST_GROUND);
   if (wave) {
     g.save(); g.beginPath(); g.rect(0, ST_GROUND, BW, ST_CURB - ST_GROUND); g.clip();
@@ -2521,7 +2467,7 @@ function renderQuest() {
   if (!el) return;
   const t = R.started && S.quest && S.quest !== 'done' ? QUEST_TEXT[S.quest] : '';
   el.hidden = !t;
-  if (t && el.dataset.q !== S.quest) { el.dataset.q = S.quest; el.innerHTML = `<img class="q-ic" src="${asset('ui/nhiem-vu.png')}" alt="" /><span class="q-main"><span class="lbl">Nhiệm vụ chính</span><span>${t}</span></span>`; }
+  if (t && el.dataset.q !== S.quest) { el.dataset.q = S.quest; el.innerHTML = `<span class="lbl">Nhiệm vụ</span><span>${t}</span>`; }
 }
 const BUS_DRIVER = { skin: '#C68B5E', hair: '#1E1A1A', long: false, hat: 3, capColor: '#2E8B57', shirt: '#2E8B57', style: 'collar', pants: '#2F3E46' };
 
@@ -2548,7 +2494,7 @@ function homeObjects(hits, layer) {
   } });
   hits.push({ x: 910, y: 480, w: 150, h: 115, kind: 'kho', pri: 2 });
   // cửa nhà = tủ đồ
-  hits.push(IMG['nha/nha'] ? { x: 636, y: 280, w: 100, h: 140, kind: 'door', pri: 2 } : { x: 590, y: 300, w: 100, h: 125, kind: 'door', pri: 2 });
+  hits.push({ x: 590, y: 300, w: 100, h: 125, kind: 'door', pri: 2 });
   // hộp thư = tin tức
   layer.push({ y: 540, draw: () => {
     ctx.fillStyle = '#1F6F8B'; rr(ctx, 858, 470, 34, 30, 4); ctx.fill(); ctx.fillStyle = '#6B4F3A'; ctx.fillRect(872, 500, 6, 40);
@@ -2662,7 +2608,7 @@ function closeModal() {
 }
 const MODAL_HTML = { market: () => marketHTML(R.modalArg), debt: () => debtHTML(), fun: () => funHTML(), kho: () => khoHTML(), gian: () => gianHTML(...R.modalArg), neighbors: () => neighborsHTML(),
   fashion: () => fashionHTML(), news: () => newsHTML(), cafe: () => cafeHTML(), street2: () => street2HTML(),
-  fishshop: () => fishShopHTML(), settings: () => settingsHTML(), bike: () => bikeHTML(), mock: () => mockHTML(), basket: () => basketHTML(), book: () => bookHTML(), profile: () => profileHTML(R.modalArg), char: () => charHTML() };
+  fishshop: () => fishShopHTML(), bike: () => bikeHTML(), mock: () => mockHTML(), basket: () => basketHTML(), book: () => bookHTML(), profile: () => profileHTML(R.modalArg), char: () => charHTML() };
 function refreshModal() {
   if (!R.modal || !MODAL_HTML[R.modal]) return;
   const b = $('modal-body');
@@ -2915,8 +2861,6 @@ $('modal-body').addEventListener('click', (e) => {
     case 'repair': repairGian(si, i); break;
     case 'upstall': upgradeStall(si, i); break;
     case 'street2': return buyStreet2();
-    case 'sound': toggleSound(); break;
-    case 'mock': closeModal(); openMock(); return;
   }
   refreshModal();
 });
@@ -2931,12 +2875,13 @@ function renderDock() {
     const locked = !kpOpen(k);
     return `<button class="kp${cur === 'kp' + k ? ' on' : ''}${locked ? ' locked' : ''}${isVip(k) ? ' vip' : ''}" data-go="kp${k}" title="${locked ? `${kpLabel(k)}: thuê đủ 6 lô ${kpLabel(k - 1)} để mở` : `${kpLabel(k)} · ${KP_NAMES[k]}${isVip(k) ? ' (phố mặt tiền, thuê tiệm được)' : ''}`}"><span class="kp-sign">${locked ? '<i class="kp-lock" aria-hidden="true"></i>' : ''}KP ${k + 1}</span><span class="kp-post"></span><span class="kp-pin"></span></button>`;
   }).join('');
-  const ic = (go, icon, label) => `<button class="nav-ic${cur === go ? ' on' : ''}" data-go="${go}"><img class="ni" src="${asset(icon)}" alt="" /><span class="nl">${label}</span></button>`;
-  $('dock').innerHTML = `${ic('home', 'ui/nha.png', 'Nhà riêng')}<div class="kp-track"><span class="kp-road"></span>${kps}</div>${ic('market', 'ui/cho.png', 'Chợ')}${ic('cafe', 'ui/ca-phe.svg', 'Cà phê')}${ic('fish', 'ui/ho-cau.svg', 'Hồ câu')}${ic('kho', 'ui/tui-do.png', 'Túi đồ')}`;
+  const ic = (go, icon, label) => `<button class="nav-ic${cur === go ? ' on' : ''}" data-go="${go}"><span class="ni" aria-hidden="true">${icon}</span><span class="nl">${label}</span></button>`;
+  $('dock').innerHTML = `${ic('home', '🏠', 'Nhà riêng')}<div class="kp-track"><span class="kp-road"></span>${kps}</div>${ic('market', '🛒', 'Chợ')}${ic('cafe', '☕', 'Cà phê')}${ic('fish', '🎣', 'Hồ câu')}${ic('kho', '🎒', 'Túi đồ')}`;
   $('topicons').innerHTML = `
-    <button class="top-ic" data-nav="news" title="Tin khu phố (N)" aria-label="Tin khu phố"><img src="${asset('ui/loa.png')}" alt="" />${R.unread ? `<span class="badge">${Math.min(R.unread, 9)}</span>` : ''}<em>Tin</em></button>
-    <button class="top-ic" data-nav="neighbors" title="Hàng xóm (X)" aria-label="Hàng xóm"><img src="${asset('ui/hang-xom.png')}" alt="" /><em>Hàng xóm</em></button>
-    <button class="top-ic" data-nav="char" title="Nhân vật (T)" aria-label="Nhân vật"><img src="${asset('ui/ruong.png')}" alt="" /><em>Nhân vật</em></button>`;
+    <button class="top-ic" data-nav="news" title="Tin khu phố (N)" aria-label="Tin khu phố"><span aria-hidden="true">📰</span>${R.unread ? `<span class="badge">${Math.min(R.unread, 9)}</span>` : ''}<em>Tin</em></button>
+    <button class="top-ic" data-nav="neighbors" title="Hàng xóm (X)" aria-label="Hàng xóm"><span aria-hidden="true">👥</span><em>Hàng xóm</em></button>
+    <button class="top-ic" data-nav="char" title="Nhân vật (T)" aria-label="Nhân vật"><span aria-hidden="true">👕</span><em>Nhân vật</em></button>
+    <button class="top-ic test" data-nav="mock" title="Bảng thử nghiệm: nạp dữ liệu thử, gọi sự kiện" aria-label="Bảng thử nghiệm"><span aria-hidden="true">🧪</span><em>Thử nghiệm</em></button>`;
   renderCtx();
 }
 // Nút riêng của từng cảnh, nổi phía trên thanh dưới
@@ -3004,22 +2949,6 @@ $('modal-body').addEventListener('input', (e) => {
   if (e.target.id === 'char-name') { S.player.name = e.target.value.trim().slice(0, 16) || 'Bạn'; }
 });
 
-// mặt nhân vật ở góc HUD: vẽ lại chỉ khi đổi đồ
-let hudFaceKey = '';
-function drawHudFace() {
-  const cv = $('hud-face');
-  if (!cv) return;
-  const look = playerLook(), key = JSON.stringify(look);
-  if (key === hudFaceKey) return;
-  hudFaceKey = key;
-  const g = cv.getContext('2d');
-  const grd = g.createLinearGradient(0, 0, 0, cv.height);
-  grd.addColorStop(0, '#CFE8F2'); grd.addColorStop(1, '#F3E3B8');
-  g.fillStyle = grd; g.fillRect(0, 0, cv.width, cv.height);
-  g.save(); g.translate(44, 168); g.scale(1.18, 1.18);
-  drawPerson(g, { x: 0, y: 0, dir: 1, look: { ...look, scale: 1 }, moving: false, phase: 0 });
-  g.restore();
-}
 function updateHUD() {
   renderQuest();
   const cb = document.querySelector('.coin-btn b');
@@ -3030,10 +2959,6 @@ function updateHUD() {
   $('xp-bar').style.width = (S.level >= MAX_LVL ? 100 : clamp(S.xp / xpNeed(S.level), 0, 1) * 100) + '%';
   $('energy-bar').style.width = (S.energy / energyMax() * 100) + '%';
   $('energy-val').textContent = `${S.energy}/${energyMax()}`;
-  const left = S.energy >= energyMax() ? 0 : Math.max(0, 45 - Math.floor((now() - S.energyAt) / 1000));
-  $('energy-next').textContent = left ? `+1 sau 0:${String(left).padStart(2, '0')}` : 'Đầy sức';
-  $('name-val').textContent = S.player.name;
-  drawHudFace();
   $('energy-pill').classList.toggle('low', S.energy < 3);
   const sly = S.karma < 0;
   $('karma-pill').classList.toggle('sly', sly);
@@ -3071,30 +2996,14 @@ function buildBg(id) {
   if (id === 'pond') { drawPondBg(g, rnd, rp, lights, PM); g.restore(); return { canvas: c, lights, lamps }; }
   if (id === 'market') { drawMarketBg(g, rnd, lights, PM); g.restore(); drawMarketFloor(g, BW); return { canvas: c, lights, lamps }; }
   const fill = (a, b) => { let xx = a; while (xx < b - 1) { let w = 90 + Math.floor(rnd() * 50); if (b - (xx + w) < 60) w = b - xx; drawHouse(g, xx, w, rnd, rp, lights); xx += w; } };
-  if (id === 'cafe' && IMG['nha/cafe']) {
-    // dãy tiệm giống mockup: SHOP · Café · Văn phòng
-    fill(-10 - PM, 176); fill(1168, SW + 10 + PM);
-    drawImg(g, 'nha/shop', 312, GROUND + 6, 292);
-    drawImg(g, 'nha/cafe', 640, GROUND + 6, 336);
-    drawImg(g, 'nha/van-phong', 1002, GROUND + 6, 336);
-  } else if (id === 'cafe') { fill(-10 - PM, 270); fill(1010, SW + 10 + PM); drawCafeFront(g, lights); }
-  else if (id === 'home' && IMG['nha/nha']) {
-    fill(-10 - PM, 250); fill(1030, SW + 10 + PM);
-    drawImg(g, 'pho/cay', 330, GROUND + 14, 230);
-    drawImg(g, 'pho/cay', 958, GROUND + 14, 214);
-    drawImg(g, 'nha/nha', 640, GROUND + 8, 360);
-    drawImg(g, 'pho/hang-rao', 300, GROUND + 22, 46);
-    drawImg(g, 'pho/bon-hoa', 900, GROUND + 22, 42);
-  } else if (id === 'home') { fill(-10 - PM, 280); fill(1000, SW + 10 + PM); drawHomeFront(g, lights); }
+  if (id === 'cafe') { fill(-10 - PM, 270); fill(1010, SW + 10 + PM); drawCafeFront(g, lights); }
+  else if (id === 'home') { fill(-10 - PM, 280); fill(1000, SW + 10 + PM); drawHomeFront(g, lights); }
   else if (isSt && isVip(stIdx)) { let xx = -10 - PM; while (xx < SW + PM + 10) { const w = 150 + Math.floor(rnd() * 70); drawHouse(g, xx, w, rnd, rp, lights, ST_GROUND, 3); xx += w; } }
   else if (isSt) drawWallBg(g, rnd, rp, lights, PM, stIdx);
   g.restore();
   if (isSt) {
-    drawStreetGround(g, rnd, BW, isVip(stIdx) && !id.startsWith('nb_'));
-    // chậu cây sát tường và đèn đường ở khe giữa các lô
-    for (const x of [445, 835]) { drawImg(g, 'pho/chau-cay', PM + x, ST_GROUND + 26, 58); drawImg(g, 'pho/den-duong', PM + x, ST_CURB + 4, 150); }
-    if (!drawImg(g, 'pho/tru-nuoc', PM + 1200, 552, 60)) drawHydrant(g, PM + 1200, 548);
-    drawBin(g, PM + 60, 360);
+    drawStreetGround(g, rnd, BW, stIdx % 2 === 1 || isVip(stIdx) || id.startsWith('nb_'));
+    drawHydrant(g, PM + 1200, 548); drawBin(g, PM + 60, 360);
     drawWires(g, rnd, BW);
     return { canvas: c, lights, lamps };
   }
@@ -3226,7 +3135,6 @@ function drawCafeFront(g, lights) {
   ['Đen đá ........ 12k', 'Sữa đá ........ 15k', 'Bạc xỉu ....... 18k', 'Trà đá .......... 3k'].forEach((s, k) => g.fillText(s, x0 + 372, GROUND - 96 + k * 20));
 }
 function drawSidewalk(g, rnd, BW, dividers, wave) {
-  if (!wave && paintGround(g, GROUND, CURB, BW, rnd)) return;
   g.fillStyle = wave ? '#E9E4D8' : '#CDBB9C'; g.fillRect(0, GROUND, BW, CURB - GROUND);
   if (wave) { // gạch sóng đen trắng kiểu phố đi bộ
     g.save(); g.beginPath(); g.rect(0, GROUND, BW, CURB - GROUND); g.clip();
@@ -4139,16 +4047,12 @@ window.addEventListener('keydown', (e) => {
   else if (/^[1-6]$/.test(key) && R.view === 'street') { const i = Number(key) - 1, f = frontOf(i); walkTo(f.x, f.y, () => openGian(S.cur, i)); }
 });
 $('btn-flee').addEventListener('click', flee);
-function toggleSound() {
+$('btn-sound').addEventListener('click', () => {
   Snd.on = !Snd.on; Snd.init();
+  $('btn-sound').classList.toggle('off', !Snd.on);
+  $('btn-sound').setAttribute('aria-label', Snd.on ? 'Tắt tiếng' : 'Bật tiếng');
   try { localStorage.setItem('vuaviahe_sound', Snd.on ? '1' : '0'); } catch { /* bỏ qua */ }
-}
-function settingsHTML() {
-  return `<div class="kv"><span>Âm thanh</span><button class="btn ${Snd.on ? 'green' : 'paper'}" data-act="sound">${Snd.on ? 'Đang bật' : 'Đang tắt'}</button></div>
-    <div class="kv"><span>Bảng thử nghiệm: nạp dữ liệu thử, gọi sự kiện</span><button class="btn paper" data-act="mock">Mở</button></div>`;
-}
-const openSettings = () => openModal('Cài đặt', settingsHTML(), { kind: 'settings' });
-$('btn-settings').addEventListener('click', () => { if (R.started) openSettings(); });
+});
 $('btn-rotate-skip').addEventListener('click', () => { document.body.classList.add('skip-rotate'); fit(); });
 document.addEventListener('visibilitychange', () => { if (document.hidden && R.started) save(); });
 
@@ -4198,8 +4102,7 @@ $('btn-continue').addEventListener('click', () => {
 
 let softT = 0;
 function start(data) {
-  try { if (localStorage.getItem('vuaviahe_sound') === '0') Snd.on = false; } catch { /* bỏ qua */ }
-  loadAssets();
+  try { if (localStorage.getItem('vuaviahe_sound') === '0') { Snd.on = false; $('btn-sound').classList.add('off'); } } catch { /* bỏ qua */ }
   fit();
   rollPrices();
   if (data?.save && data.started) {
