@@ -25,6 +25,11 @@ Mở `http://localhost:5173`. Game tự lưu trong trình duyệt (localStorage)
 - **Quán cà phê**: chỗ tụ tập có chat, bấm vào người khác để sang nhà; **góc giải trí** có Vòng quay, Bầu cua, Bài cào (tiền trong game).
 - Khung hình tự co giãn theo màn hình, màn rộng thì cảnh mở rộng sang hai bên.
 
+## Thử nghiệm nhanh
+
+- Nút **Bày tự động** (phím B) ở khu phố: đem hết sạp trên xe ra lô trống và châm đầy hàng từ kho cho mọi sạp.
+- Nút **Thử nghiệm** ở góc trên bên phải: nạp dữ liệu thử (5 triệu, cấp 12, kho đầy, thuê sẵn 3 khu phố, 14 sạp đã bày), thêm tiền, lên cấp, hồi sức, gọi công an / dân anh chị / xe đổ hàng / hàng xóm quậy, tua 10 phút, xóa bản lưu.
+
 ## Chuẩn bị cho server
 
 Mọi thứ liên quan tới người chơi khác đi qua đối tượng `Net` trong `main.js` (hiện là `LocalNet`, chạy ngoại tuyến với hàng xóm do máy điều khiển). Khi có server, viết một đối tượng có cùng các hàm `myProfile`, `roomPlayers`, `sendChat`, `fetchStreet`, `streetAction` rồi gán cho `Net`.

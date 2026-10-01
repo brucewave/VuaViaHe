@@ -934,3 +934,12 @@ button.slot-cell:hover { filter: brightness(1.08); }
 .kp.vip .kp-sign { border-color: #F7C948; box-shadow: 0 0 0 2px var(--ink), 0 3px 0 2px var(--ink), 0 0 10px rgba(247,201,72,.7); }
 .kp.vip:not(.locked) .kp-sign { background: #7A3E9D; }
 .kp.on .kp-sign { background: var(--straw); }
+
+/* bày tự động, bảng thử nghiệm */
+#ctx.ctx-street { flex-direction: row; }
+.auto-btn { font-size: 18px; padding: 10px 16px; }
+.top-ic.test { background: #E4F3D6; }
+.mock-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
+.mock-grid .btn { font-size: 16px; padding: 10px 12px; white-space: normal; text-align: center; }
+.mock-grid .btn small { color: inherit; opacity: 0.7; font: 600 11px var(--font-body); }
+.mock-grid .btn.big { grid-column: 1 / -1; font-size: 22px; flex-direction: column; }

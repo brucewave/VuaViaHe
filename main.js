@@ -1793,6 +1793,7 @@ function bikeHTML() {
         <button class="btn paper" data-act="ufill" ${khoCount() ? '' : 'disabled'}>Bày đầy hàng từ kho</button>
         ${next && S.level < STALLS[next].lvl ? `<small>Lên ${STALLS[next].name} cần cấp ${STALLS[next].lvl}.</small>` : ''}`
         : '<p class="empty-note">Xe trống trơn. Mua sạp mới, hoặc thu sạp ngoài phố về.</p>'}
+      <button class="btn green" data-act="uauto" ${S.bike.length ? '' : 'disabled'}>Bày hết ra lô tự động</button>
       <button class="btn paper" data-act="ubuy" ${S.money >= price && nUnits < MAX_UNITS ? '' : 'disabled'}>Mua gánh mới · ${fmt(price)}</button>
     </div>
   </div>`;
@@ -1809,6 +1810,7 @@ function onBikeAct(d) {
     case 'uup': if (u) { const next = STALL_ORDER[STALL_ORDER.indexOf(u.stall) + 1]; if (next && S.level >= STALLS[next].lvl && S.money >= STALLS[next].price) { S.money -= STALLS[next].price; u.stall = next; Snd.level(); toast(`Sạp lên đời ${STALLS[next].name}!`, 'gold'); } } return true;
     case 'ubuy': { const n = totalUnits(), price = UNIT_PRICE(Math.max(0, n - 1)); if (S.money >= price && n < MAX_UNITS) { S.money -= price; S.bike.push(newUnit()); R.bikeSel = S.bike.length - 1; R.bikePage = Math.floor(R.bikeSel / 6); Snd.buy(); toast(`Mua thêm một đôi gánh, ${S.bike[R.bikeSel].seller.name} sẽ bán giùm.`, 'good'); } return true; }
     case 'uplace': if (u) startPlacing(sel); return false;
+    case 'uauto': closeModal(); autoPlaceAll(); return false;
   }
   return null;
 }
@@ -1818,6 +1820,92 @@ function bikeMenu() {
     { label: 'Chạy xe đi…', fn: () => talk('Xe máy của bạn', playerLook(), ['Chạy đi đâu? Mỗi chuyến 3.000đ tiền xăng.'], { choices: travelChoices('bike') }) },
     { label: 'Thôi', fn: null },
   ] });
+}
+
+// ---------- Bày tự động ----------
+// Đem hết sạp trên xe ra các lô trống (ưu tiên khu phố đang đứng), rồi châm đầy hàng cho mọi sạp đang bày.
+function placeUnitDirect(u, si, li) {
+  const G = S.streets[si].gians[li];
+  if (!unitQty(u)) fillUnit(u);
+  for (const f of UNIT_FIELDS) G[f] = u[f];
+  G.placed = true; G.cash = 0; G.pausedUntil = 0; G.sellerAway = false;
+}
+function autoPlaceAll(quiet) {
+  let placed = 0;
+  const order = [S.cur, ...Array.from({ length: S.streets.length }, (_, k) => k).filter((k) => k !== S.cur)];
+  for (const si of order) {
+    S.streets[si].gians.forEach((G, li) => {
+      if (!S.bike.length || !G.open || G.placed) return;
+      if (si === S.cur && R.view === 'street' && !quiet) placeUnit(0, si, li);
+      else placeUnitDirect(S.bike.shift(), si, li);
+      placed++;
+    });
+  }
+  // châm hàng cho các sạp đang bày
+  let filled = 0;
+  for (const { g } of allGians()) if (g.placed && !g.broken) filled += fillUnit(g);
+  if (!quiet) {
+    if (placed || filled) { Snd.buy(); toast(`Bày tự động: ${placed} sạp ra lô, châm thêm ${filled} món hàng.`, 'good'); }
+    else toast(S.bike.length ? 'Hết lô trống. Thuê thêm lô đi!' : khoCount() ? 'Sạp nào cũng đầy hàng rồi.' : 'Kho trống, lên chợ đầu mối gom hàng trước đã.', 'bad');
+    if (placed) questProgress('place');
+  }
+  renderCtx();
+  return { placed, filled };
+}
+
+// ---------- Bảng thử nghiệm (dành cho bản test) ----------
+function loadMock() {
+  S.quest = 'done'; S.level = 12; S.xp = 0;
+  S.money = 5000000; S.debt = 0;
+  S.khoLvl = Math.max(S.khoLvl, 3);
+  S.kho = {};
+  for (const id of GOOD_IDS) if (GOODS[id].lvl <= S.level) S.kho[id] = 40;
+  for (let si = 0; si < 3; si++) S.streets[si].gians.forEach((g) => { g.open = true; });
+  const types = ['ganh', 'xe_day', 'sap', 'kiot'];
+  for (const { g } of allGians()) if (g.placed) { g.placed = false; g.slots = emptySlots(); g.seller = null; }
+  S.bike = Array.from({ length: 14 }, (_, k) => newUnit(types[k % 4]));
+  S.bike.forEach((u, k) => { u.du = k % 2 === 0; u.ghe = k % 3 === 0; u.phep = k % 4 === 0; });
+  S.fishing.rods = Object.keys(RODS); S.fishing.rod = 'carbon';
+  for (const id of Object.keys(BAITS)) S.fishing.bait[id] = 50;
+  S.owned = Object.keys(FASHION);
+  S.outfit = { hat: 'non_ket', shirt: 'ao_hoa', pants: 'quan_jean', shoes: 'giay_bata', acc: 'khan_ran' };
+  for (const n of S.neighbors) n.friend = Math.max(n.friend, 60);
+  S.energy = energyMax();
+  R.runners = []; R.cries = {};
+  const r = autoPlaceAll(true);
+  for (const id of GOOD_IDS) if (GOODS[id].lvl <= S.level) S.kho[id] = 40;   // bày xong thì nạp lại kho
+  save(); renderDock(); refreshModal();
+  toast(`Đã nạp dữ liệu thử: 5 triệu, cấp 12, kho đầy hàng, thuê sẵn 3 khu phố, ${r.placed} sạp đã bày ra lô.`, 'gold');
+}
+function mockHTML() {
+  const onStreet = R.view === 'street';
+  const b = (act, label, sub, dis) => `<button class="btn paper" data-mock="${act}" ${dis ? 'disabled' : ''}>${label}${sub ? `<small>${sub}</small>` : ''}</button>`;
+  return `<p class="event-text">Công cụ cho bản thử nghiệm. Các nút này sửa thẳng vào bản lưu trên máy, chơi thật thì đừng bấm nha.</p>
+    <div class="mock-grid">
+      <button class="btn big" data-mock="load">Nạp dữ liệu thử<small>Ghi đè tiến trình hiện tại</small></button>
+      ${b('money', '+1.000.000đ')}${b('level', 'Lên 1 cấp')}${b('energy', 'Hồi đầy sức')}${b('kho', 'Kho đầy hàng', 'Mỗi món 40')}
+      ${b('police', 'Công an tới', 'Đứng ở khu phố', !onStreet)}${b('thug', 'Dân anh chị tới')}${b('spill', 'Xe đổ hàng', 'Đứng ở khu phố', !onStreet)}
+      ${b('nb', 'Hàng xóm quậy')}${b('time', 'Tua 10 phút', 'Hàng bán như lúc vắng')}${b('auto', 'Bày tự động')}
+      <button class="btn red" data-mock="reset">Xóa bản lưu, chơi lại</button>
+    </div>`;
+}
+function openMock() { openModal('Bảng thử nghiệm', mockHTML(), { kind: 'mock' }); }
+function onMockAct(act) {
+  switch (act) {
+    case 'load': loadMock(); return;
+    case 'money': S.money += 1000000; toast('+1.000.000đ', 'good'); break;
+    case 'level': addXp(Math.max(1, xpNeed(S.level) - S.xp)); break;
+    case 'energy': S.energy = energyMax(); toast('Sức đầy rồi.', 'good'); break;
+    case 'kho': S.khoLvl = Math.max(S.khoLvl, 3); for (const id of GOOD_IDS) if (GOODS[id].lvl <= S.level) S.kho[id] = Math.max(S.kho[id] || 0, 40); toast('Kho đầy hàng.', 'good'); break;
+    case 'police': closeModal(); if (!eligiblePolice().length) { toast('Không có sạp nào chưa có giấy phép ở đây để công an phạt.', 'bad'); return; } startPolice(); return;
+    case 'thug': closeModal(); startThug(); return;
+    case 'spill': closeModal(); R.spill = { phase: 'come', x: R.cam - 260, stopX: rand(420, 860), items: [], t: 0, say: null, sayT: 0, picked: 0 }; return;
+    case 'nb': neighborActs(false); toast('Hàng xóm vừa ra tay, xem Tin khu phố.'); break;
+    case 'time': { const before = allGians().reduce((a, x) => a + x.g.cash, 0); applyOffline(600); R.offline = null; toast(`Tua 10 phút: két các sạp có thêm ${fmt(allGians().reduce((a, x) => a + x.g.cash, 0) - before)}.`, 'good'); break; }
+    case 'auto': autoPlaceAll(); break;
+    case 'reset': try { localStorage.removeItem(SAVE_KEY); } catch { /* bỏ qua */ } closeModal(); beginGame(true); return;
+  }
+  save(); refreshModal();
 }
 
 // ---------- Đi lại: xe máy, xe buýt, đi bộ ----------
@@ -2184,7 +2272,7 @@ function closeModal() {
 }
 const MODAL_HTML = { market: () => marketHTML(R.modalArg), debt: () => debtHTML(), fun: () => funHTML(), kho: () => khoHTML(), gian: () => gianHTML(...R.modalArg), neighbors: () => neighborsHTML(),
   fashion: () => fashionHTML(), news: () => newsHTML(), cafe: () => cafeHTML(), street2: () => street2HTML(),
-  fishshop: () => fishShopHTML(), bike: () => bikeHTML(), basket: () => basketHTML(), book: () => bookHTML(), profile: () => profileHTML(R.modalArg), char: () => charHTML() };
+  fishshop: () => fishShopHTML(), bike: () => bikeHTML(), mock: () => mockHTML(), basket: () => basketHTML(), book: () => bookHTML(), profile: () => profileHTML(R.modalArg), char: () => charHTML() };
 function refreshModal() {
   if (!R.modal || !MODAL_HTML[R.modal]) return;
   const b = $('modal-body');
@@ -2385,6 +2473,7 @@ $('modal-body').addEventListener('click', (e) => {
   if (!t || t.disabled) return;
   const d = t.dataset;
   if (R.modal === 'fun') return onFunClick(d);
+  if (R.modal === 'mock' && d.mock) return onMockAct(d.mock);
   if (R.modal === 'bike') { const r = onBikeAct(d); if (r === true) refreshModal(); if (r !== null) return; }
   const [si, i] = Array.isArray(R.modalArg) ? R.modalArg : [];
   if (d.buy) return buy(d.buy, d.n);
@@ -2445,7 +2534,8 @@ function renderDock() {
   $('topicons').innerHTML = `
     <button class="top-ic" data-nav="news" title="Tin khu phố (N)" aria-label="Tin khu phố"><span aria-hidden="true">📰</span>${R.unread ? `<span class="badge">${Math.min(R.unread, 9)}</span>` : ''}<em>Tin</em></button>
     <button class="top-ic" data-nav="neighbors" title="Hàng xóm (X)" aria-label="Hàng xóm"><span aria-hidden="true">👥</span><em>Hàng xóm</em></button>
-    <button class="top-ic" data-nav="char" title="Nhân vật (T)" aria-label="Nhân vật"><span aria-hidden="true">👕</span><em>Nhân vật</em></button>`;
+    <button class="top-ic" data-nav="char" title="Nhân vật (T)" aria-label="Nhân vật"><span aria-hidden="true">👕</span><em>Nhân vật</em></button>
+    <button class="top-ic test" data-nav="mock" title="Bảng thử nghiệm: nạp dữ liệu thử, gọi sự kiện" aria-label="Bảng thử nghiệm"><span aria-hidden="true">🧪</span><em>Thử nghiệm</em></button>`;
   renderCtx();
 }
 // Nút riêng của từng cảnh, nổi phía trên thanh dưới
@@ -2456,7 +2546,7 @@ function renderCtx() {
     html = `<div class="ctx-card"><p class="ctx-note"><b>Chọn lô trống</b> (khung vàng nhấp nháy) để bày sạp. Bấm chỗ khác hoặc Esc để thôi.</p></div>`;
   } else if (R.view === 'street') {
     const cash = S.streets[S.cur].gians.reduce((a, g) => a + g.cash, 0);
-    html = `<button class="btn coin-btn" data-nav="collect"><span>Thu tiền</span><b>${fmtK(cash)}</b><kbd>Space</kbd></button>`;
+    html = `<button class="btn green auto-btn" data-nav="autoplace" title="Đem hết sạp trên xe ra lô trống và châm đầy hàng từ kho">Bày tự động<kbd>B</kbd></button><button class="btn coin-btn" data-nav="collect"><span>Thu tiền</span><b>${fmtK(cash)}</b><kbd>Space</kbd></button>`;
   } else if (R.view === 'neighbor') {
     const tools = [['hand', 'Tay không', 'Dọn giúp · chôm két'], ['trash', 'Vứt rác', '2 sức'], ['rat', 'Thả chuột', '3 sức']];
     html = `<div class="ctx-card"><div class="tools">${tools.map(([k, n, s]) => `<button class="tool${R.tool === k ? ' on' : ''}" data-tool="${k}">${n}<small>${s}</small></button>`).join('')}</div>
@@ -2500,6 +2590,8 @@ function onUiClick(e) {
   else if (nav === 'cafelist') openModal('Quán cà phê cóc', cafeHTML(), { kind: 'cafe' });
   else if (nav === 'collect') { collectAll(); renderCtx(); }
   else if (nav === 'news') openNews();
+  else if (nav === 'mock') openMock();
+  else if (nav === 'autoplace') autoPlaceAll();
   else if (nav === 'fun') openFun();
   else if (nav === 'fishact') fishAction();
   else if (nav === 'basket') openModal('Giỏ cá', basketHTML(), { kind: 'basket' });
@@ -3469,6 +3561,7 @@ window.addEventListener('keydown', (e) => {
   if (MOVE_KEYS.has(key)) { e.preventDefault(); R.keys.add(key); return; }
   if (key === 'c') startTrip('bike', 'market'); else if (key === 'k') openKho(); else if (key === 'x') openNeighbors();
   else if (key === 'f') startTrip('bike', 'cafe'); else if (key === 't') openChar(); else if (key === 'n') openNews();
+  else if (key === 'b') autoPlaceAll();
   else if (key === 'q') startTrip('bike', 'fish'); else if (key === 'h') startTrip('bike', 'home');
   else if (/^[1-6]$/.test(key) && R.view === 'street') { const i = Number(key) - 1, f = frontOf(i); walkTo(f.x, f.y, () => openGian(S.cur, i)); }
 });
