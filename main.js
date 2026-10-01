@@ -1448,9 +1448,9 @@ function drawFunCorner(hits, layer) {
 // Phía sau là bờ tường thấp (khu phố VIP mới có dãy nhà lớn), vỉa hè sâu, mặt đường rộng.
 const KP_COUNT = 10, LOTS_PER_KP = 6;
 const ST_GROUND = 300, ST_CURB = 566;          // chân tường, mép vỉa hè của khu phố
-const ST_WALK = { y0: 318, y1: 580 };
+const ST_WALK = { y0: 314, y1: 576 };
 const LOT_XS = [250, 640, 1030];
-const ROW_BASE = [428, 556];
+const ROW_BASE = [404, 508];
 const VIP_KP = [4, 9];                          // KP5 và KP10 là phố VIP: nhà lớn phía sau, bán nhanh hơn
 const isVip = (si) => VIP_KP.includes(si);
 const lotRow = (i) => (i < 3 ? 0 : 1);
@@ -3405,7 +3405,7 @@ canvas.addEventListener('pointerdown', (e) => {
   if (h && h.kind === 'spill') { const it = h.item; walkTo(it.x, walkBand().y1, () => pickSpill(it)); return; }
   if (h && h.kind === 'driver') { walkTo(R.spill.x + 120, walkBand().y1, () => R.spill && talk('Chú ba gác', { skin: '#C68B5E', hair: '#1E1A1A', long: false, hat: 2, helmet: '#F7B32B', shirt: '#3E7CB1', pants: '#2F3E46' }, ['Trời ơi vấp cái ổ gà, đổ hết bia rồi! Phụ chú nhặt với con ơi!'], { choices: [{ label: 'Phụ nhặt giùm', sub: '2 sức', fn: helpSpill }, { label: 'Thôi', fn: null }] })); return; }
   if (h && h.kind === 'parking') { walkTo(210, 600, () => talk('Bãi giữ xe', BUS_DRIVER, ['Ra về bằng gì đây?'], { choices: [{ label: 'Chạy xe máy', sub: fmt(FUEL_COST), fn: () => talk('Xe máy của bạn', playerLook(), ['Chạy đi đâu?'], { choices: travelChoices('bike') }) }, { label: 'Đón xe buýt', sub: fmt(BUS_FARE), fn: () => talk('Trạm xe buýt 52', BUS_DRIVER, ['Đi đâu nè?'], { choices: travelChoices('bus') }) }, { label: 'Thôi', fn: null }] })); return; }
-  const walkFloor = () => { if (p.y > GROUND + 4 || R.view === 'cafe') walkTo(p.x, p.y); };
+  const walkFloor = () => { if (p.y > walkBand().y0 - 40 || R.view === 'cafe') walkTo(p.x, p.y); };
   if (R.placing != null && (!h || h.kind !== 'lot')) { R.placing = null; renderCtx(); toast('Thôi không bày nữa.'); if (!h) return; }
   if (!h) { if (R.view !== 'fish') walkFloor(); return; }
   if (h.kind === 'portal') { const pt = portalsFor().find((q) => q.side === h.side); walkTo(h.x + h.w / 2, FRONT_Y + 10, () => pt?.go()); return; }
@@ -3415,7 +3415,7 @@ canvas.addEventListener('pointerdown', (e) => {
     else if (h.kind === 'trash') walkTo(h.wx, h.wy, () => cleanTrash(S.cur, i));
     else if (h.kind === 'rat') walkTo(h.wx, h.wy, () => chaseRat(S.cur, i));
     else if (h.kind === 'visitor') { const v = R.visitors.find((q) => q.id === h.id); walkTo((v?.x ?? p.x) - 60, v?.y ?? p.y, () => openProfile(h.id)); }
-    else if (h.kind === 'lot') { if (R.placing != null) placeUnit(R.placing, S.cur, i); else walkTo(f.x, f.y, () => openGian(S.cur, i)); }
+    else if (h.kind === 'lot') { if (R.placing != null) placeUnit(R.placing, S.cur, i); else { walkTo(p.x, p.y); if (!R.lotHintAt || now() - R.lotHintAt > 20000) { R.lotHintAt = now(); toast('Lô trống. Bấm <b>xe máy</b> ở đầu phố để chọn sạp đem ra bày.'); } } }
     else if (h.kind === 'gian') walkTo(f.x, f.y, () => openGian(S.cur, i));
     else walkFloor();
   } else if (R.view === 'neighbor') {
