@@ -7,7 +7,8 @@ let W = 1280;            // bề rộng khung hình, co giãn theo màn hình
 const H = 720, SW = 1280; // SW: bề rộng các cảnh cố định (nhà, chợ, cà phê, hồ câu)
 const GROUND = 420;          // chân tường dãy nhà
 const CURB = 636;            // mép vỉa hè
-const WALK_Y0 = 522, WALK_Y1 = 626;   // dải vỉa hè nhân vật đi được
+const WALK_Y0 = 452, WALK_Y1 = 626;   // cả vỉa hè, từ chân tường nhà tới mép đường
+const FRONT_Y = 540;                  // chỗ đứng ngay trước quầy sạp
 // đứng xa (sát nhà) thì nhỏ hơn, đứng gần mép đường thì to hơn
 const depthScale = (y) => 0.88 + 0.22 * clamp((y - WALK_Y0) / (WALK_Y1 - WALK_Y0), 0, 1);
 const STALL_X = 640, STALL_Y = 560;   // khung tọa độ gốc để vẽ một sạp
@@ -349,7 +350,7 @@ function onSaleVisual(i, p, good) {
   const cx = gx(i);
   if (R.buyers.length < 8 && cx > R.cam - 100 && cx < R.cam + W + 100) {
     const fromLeft = Math.random() < 0.5;
-    R.buyers.push({ x: fromLeft ? R.cam - 40 : R.cam + W + 40, y: rand(WALK_Y0 + 10, WALK_Y0 + 40), dir: fromLeft ? 1 : -1, look: makeLook(), tx: cx + (fromLeft ? -70 : 70),
+    R.buyers.push({ x: fromLeft ? R.cam - 40 : R.cam + W + 40, y: rand(FRONT_Y - 4, FRONT_Y + 24), dir: fromLeft ? 1 : -1, look: makeLook(), tx: cx + (fromLeft ? -70 : 70),
       state: 'walk', t: 0, speed: rand(170, 210), phase: 0, moving: true, item: GOODS[good]?.icon });
   }
 }
@@ -978,7 +979,7 @@ function walkBand() {
   if (R.view === 'fish') return { x0: 250, x1: 470, y0: 606, y1: 610 };
   if (R.view === 'cafe') return { x0: 40, x1: SW - 40, y0: 578, y1: 626 };
   if (R.view === 'home') return { x0: 60, x1: SW - 60, y0: WALK_Y0, y1: WALK_Y1 };
-  if (R.view === 'market') return { x0: 60, x1: SW - 60, y0: 548, y1: 626 };
+  if (R.view === 'market') return { x0: 60, x1: SW - 60, y0: 512, y1: 626 };
   return { x0: 40, x1: STREET_W - 40, y0: WALK_Y0, y1: WALK_Y1 };
 }
 function walkTo(x, y, then) {
@@ -1080,9 +1081,9 @@ function updateCrowd(dt) {
     else { const s = Math.min(1, (70 * dt) / d); v.x += dx * s; v.y += dy * s; v.dir = Math.sign(dx) || v.dir; v.moving = true; v.phase += dt * 8; }
   }
   R.visitors = R.visitors.filter((v) => v.life > 0 && R.view === 'street');
-  if (R.view !== 'cafe' && R.view !== 'market' && Math.random() < dt) {
+  if (R.view !== 'cafe' && R.view !== 'market' && Math.random() < dt * 0.5) {
     const dir = Math.random() < 0.5 ? 1 : -1;
-    R.bikes.push({ x: dir > 0 ? R.cam - 120 : R.cam + W + 120, y: dir > 0 ? 676 : 662, dir, speed: rand(170, 290), color: pick(BIKE_COLORS),
+    R.bikes.push({ x: dir > 0 ? R.cam - 120 : R.cam + W + 120, y: dir > 0 ? 712 : 700, dir, speed: rand(170, 290), color: pick(BIKE_COLORS),
       rider: { skin: pick(['#F1C9A5', '#E0AC80', '#C68B5E']), shirt: pick(SHIRTS), helmet: pick(HELMETS) },
       pass: Math.random() < 0.25 ? { shirt: pick(SHIRTS), helmet: pick(HELMETS) } : null, cargo: Math.random() < 0.15 });
   }
@@ -1478,7 +1479,7 @@ function drawPortal(p) {
   if (p.side > 0) { ctx.moveTo(x - 70, y - 20); ctx.lineTo(x + 40, y - 20); ctx.lineTo(x + 62, y); ctx.lineTo(x + 40, y + 20); ctx.lineTo(x - 70, y + 20); }
   else { ctx.moveTo(x + 70, y - 20); ctx.lineTo(x - 40, y - 20); ctx.lineTo(x - 62, y); ctx.lineTo(x - 40, y + 20); ctx.lineTo(x + 70, y + 20); }
   ctx.closePath(); ctx.fill(); ctx.stroke();
-  ctx.strokeStyle = '#6E6A64'; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(x, y + 20); ctx.lineTo(x, WALK_Y0 + 6); ctx.stroke();
+  ctx.strokeStyle = '#6E6A64'; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(x, y + 20); ctx.lineTo(x, FRONT_Y - 10); ctx.stroke();
   signText(ctx, p.label, x + (p.side > 0 ? -8 : 8), y, 15, '#FFF4D6', 120);
   return { x: x - 75, y: y - 26, w: 150, h: 90, kind: 'portal', side: p.side, pri: 2 };
 }
@@ -2056,7 +2057,7 @@ function drawSidewalk(g, rnd, BW, dividers, wave) {
   g.fillStyle = 'rgba(0,0,0,.18)'; g.fillRect(0, GROUND, BW, 6);
   if (dividers) {
     g.strokeStyle = 'rgba(255,196,60,.55)'; g.setLineDash([10, 8]); g.lineWidth = 3;
-    for (let i = 0; i <= 6; i++) { const x = STREET_PAD + i * GIAN_W; g.beginPath(); g.moveTo(x, GROUND + 10); g.lineTo(x, WALK_Y0 - 6); g.stroke(); }
+    for (let i = 0; i <= 6; i++) { const x = STREET_PAD + i * GIAN_W; g.beginPath(); g.moveTo(x, GROUND + 10); g.lineTo(x, FRONT_Y - 30); g.stroke(); }
     g.setLineDash([]);
   }
   g.fillStyle = '#9A948A'; g.fillRect(0, CURB, BW, 10);
@@ -2371,57 +2372,19 @@ function bubble(text, x, y, opts = {}) {
   ctx.fillText(text, bx + w / 2, y - hgt / 2 + 1, w - 14);
 }
 
-// thẻ hàng xếp trên quầy trước sạp: hình món to, số còn lại, giá mỗi món
-function drawGoodsCards(cx, cards, covered, mine) {
-  const n = cards.length;
-  if (!n) return;
-  const cw = n > 4 ? 54 : 62, ch = 70, gap = 6;
-  const total = n * cw + (n - 1) * gap;
-  const x0 = cx - total / 2, y = STALL_BASE - ch + 6;
-  ctx.fillStyle = '#6B4F3A'; rr(ctx, x0 - 10, y + ch - 6, total + 20, 12, 4); ctx.fill();
-  ctx.strokeStyle = '#231A14'; ctx.lineWidth = 2; ctx.stroke();
-  cards.forEach((c, k) => {
-    const x = x0 + k * (cw + gap);
-    if (!c.good || c.qty <= 0) {
-      if (!mine) return;
-      ctx.setLineDash([5, 4]); ctx.strokeStyle = 'rgba(255,244,214,.75)'; ctx.lineWidth = 2;
-      rr(ctx, x + 2, y + 6, cw - 4, ch - 14, 8); ctx.stroke(); ctx.setLineDash([]);
-      ctx.fillStyle = 'rgba(255,244,214,.75)'; ctx.font = '800 26px "Baloo 2", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText('+', x + cw / 2, y + ch / 2 - 2);
-      return;
-    }
-    const g = GOODS[c.good];
-    ctx.fillStyle = '#FFFDF4'; rr(ctx, x, y, cw, ch - 6, 9); ctx.fill();
-    ctx.strokeStyle = '#231A14'; ctx.lineWidth = 2.5; ctx.stroke();
-    emoji(ctx, g.icon, x + cw / 2, y + 26, cw > 56 ? 34 : 30);
-    // giá
-    ctx.fillStyle = '#2E7D4F'; rr(ctx, x + 4, y + ch - 26, cw - 8, 16, 5); ctx.fill();
-    ctx.fillStyle = '#FFF4D6'; ctx.font = '800 12px "Baloo 2", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(fmtK(c.price), x + cw / 2, y + ch - 17);
-    // số lượng còn
-    const low = c.cap && c.qty / c.cap <= 0.25;
-    ctx.fillStyle = low ? '#D7372B' : '#231A14'; ctx.beginPath(); ctx.arc(x + cw - 4, y + 4, 11, 0, 7); ctx.fill();
-    ctx.strokeStyle = '#FFF4D6'; ctx.lineWidth = 2; ctx.stroke();
-    ctx.fillStyle = '#FFF4D6'; ctx.font = '800 12px "Baloo 2", sans-serif'; ctx.fillText(c.qty, x + cw - 4, y + 5);
-  });
-  if (covered) { ctx.fillStyle = 'rgba(31,111,139,.78)'; rr(ctx, x0 - 6, y - 4, total + 12, ch + 4, 10); ctx.fill(); signText(ctx, 'ĐANG DẸP', cx, y + ch / 2 - 2, 18, '#FFF4D6'); }
-}
-
 // ---------- Render ----------
 function getBg(id) { if (!R.bgCache[id]) R.bgCache[id] = buildBg(id); return R.bgCache[id]; }
 function currentGians() {
   if (R.view === 'neighbor') {
     const n = nbState(R.visit), b = nbBase(R.visit);
-    return n.gians.map((g, i) => ({ open: g.open, stall: g.stall, good: g.good, qty: g.open ? 20 : 0,
-      cards: [g.good, b.goods[(i + 1) % b.goods.length]].map((id, k) => ({ good: id, qty: 12 + ((i * 7 + k * 5) % 9), price: GOODS[id].sell })), cash: g.cash, trash: g.trash, rat: g.rat, broken: false,
+    return n.gians.map((g, i) => ({ open: g.open, stall: g.stall, good: g.good, qty: g.open ? 20 : 0, cash: g.cash, trash: g.trash, rat: g.rat, broken: false,
       du: i % 2 === 0, ghe: i % 3 === 0, bang: false, phep: false, paused: false, seed: hashStr(b.id) % 997, duCol: b.color, owner: b.name, cap: 20, goods: [g.good, b.goods[(i + 1) % b.goods.length]] }));
   }
   if (R.attract) {
     const demo = [['ganh', 'kem_chuoi', 1800], ['xe_day', 'banh_mi', 0], ['sap', 'ao_thun', 32000], ['kiot', 'giay', 0], ['xe_day', 'hot_vit', 9000], [null]];
-    return demo.map(([stall, good, cash], i) => stall ? { open: true, stall, goods: [good], cards: [{ good, qty: 18, price: GOODS[good].sell }, { good, qty: 9, price: GOODS[good].sell }], cap: 20, qty: 20, cash, trash: i === 4 ? 1 : 0, rat: false, broken: false, du: true, ghe: i === 2, bang: i === 3, paused: false, seed: 0, owner: 'Vua Vỉa Hè' } : { open: false });
+    return demo.map(([stall, good, cash], i) => stall ? { open: true, stall, goods: [good], cap: 20, qty: 20, cash, trash: i === 4 ? 1 : 0, rat: false, broken: false, du: true, ghe: i === 2, bang: i === 3, paused: false, seed: 0, owner: 'Vua Vỉa Hè' } : { open: false });
   }
-  return S.streets[S.cur].gians.map((g) => ({ ...g, paused: g.pausedUntil > now(), seed: S.cur * 100, owner: S.player.name, qty: gQty(g), cap: slotsOpen(g) * slotCap(g), goods: gGoods(g),
-    cards: g.slots.slice(0, slotsOpen(g)).map((sl) => ({ good: sl.qty ? sl.good : null, qty: sl.qty, price: sl.qty ? unitPrice(g, sl.good) : 0, cap: slotCap(g) })) }));
+  return S.streets[S.cur].gians.map((g) => ({ ...g, paused: g.pausedUntil > now(), seed: S.cur * 100, owner: S.player.name, qty: gQty(g), cap: slotsOpen(g) * slotCap(g), goods: gGoods(g) }));
 }
 function bgIdNow() {
   if (R.view === 'fish') return 'pond';
@@ -2467,7 +2430,8 @@ function render() {
             ctx.fillText(S.level < lvl ? `Cần cấp ${lvl}` : fmt(cost), cx, 488);
           }
         } });
-        hits.push({ x: cx - GIAN_W / 2 + 10, y: 250, w: GIAN_W - 20, h: WALK_Y0 - 250, kind: 'gian', i });
+        hits.push({ x: cx - GIAN_W / 2 + 10, y: 230, w: GIAN_W - 20, h: GROUND - 220, kind: 'gian', i });
+        hits.push({ x: cx - 75, y: 430, w: 150, h: 104, kind: 'gian', i });
         return;
       }
       // biển hiệu gian hàng đè lên biển của căn nhà
@@ -2478,11 +2442,10 @@ function render() {
         rr(ctx, cx - GIAN_W / 2 + 14, GROUND - 100, GIAN_W - 28, 34, 6); ctx.fill(); ctx.strokeStyle = '#231A14'; ctx.lineWidth = 2.5; ctx.stroke();
         signText(ctx, `${title} · ${String(G.owner || '').toUpperCase()}`, cx, GROUND - 83, 20, '#FFF4D6', GIAN_W - 44);
       });
-      const icons = [];
+      const icons = gl.length && G.qty > 0 ? Array.from({ length: 8 }, (_, k) => GOODS[gl[k % gl.length]].icon) : [];
       layer.push({ y: STALL_BASE, draw: () => {
         drawGianStall(ctx, cx, { stall: G.stall, icons, open: !G.paused && G.qty > 0, look: sellerLook(i, G.seed), du: G.du, ghe: G.ghe, bang: G.bang, duCol: G.duCol,
           label: title });
-        if (G.cards) drawGoodsCards(cx, G.cards, G.paused, R.view === 'street');
         if (G.broken) {
           ctx.strokeStyle = '#E8C547'; ctx.lineWidth = 8; ctx.beginPath(); ctx.moveTo(cx - 110, 300); ctx.lineTo(cx + 110, 510); ctx.moveTo(cx + 110, 300); ctx.lineTo(cx - 110, 510); ctx.stroke();
           ctx.strokeStyle = '#231A14'; ctx.lineWidth = 2; ctx.setLineDash([10, 10]); ctx.stroke(); ctx.setLineDash([]);
@@ -2494,7 +2457,8 @@ function render() {
         hits.push({ x: tx - 24, y: ty - 36, w: 48, h: 44, kind: 'trash', i, pri: 2, wx: tx, wy: ty + 6 });
       }
       if (G.rat) { const rx = cx + 110, ry = 560; layer.push({ y: ry, draw: () => drawRat(ctx, rx, ry) }); hits.push({ x: rx - 34, y: ry - 30, w: 68, h: 40, kind: 'rat', i, pri: 2, wx: rx, wy: ry + 6 }); }
-      hits.push({ x: cx - GIAN_W / 2 + 10, y: 230, w: GIAN_W - 20, h: WALK_Y0 - 230, kind: 'gian', i });
+      hits.push({ x: cx - GIAN_W / 2 + 10, y: 230, w: GIAN_W - 20, h: GROUND - 220, kind: 'gian', i });
+      hits.push({ x: cx - 140, y: 280, w: 280, h: STALL_BASE - 272, kind: 'gian', i });
     });
     for (const p of portalsFor()) { const hb = drawPortal(p); hits.push(hb); }
   } else if (R.view === 'home') {
@@ -2748,15 +2712,15 @@ function hitAt(p) {
   return list[0] || null;
 }
 // đứng trước mặt gian để thao tác
-const frontOf = (i) => ({ x: gx(i) + (R.me.x < gx(i) ? -40 : 40), y: WALK_Y0 + 8 });
+const frontOf = (i) => ({ x: gx(i) + (R.me.x < gx(i) ? -40 : 40), y: FRONT_Y });
 canvas.addEventListener('pointerdown', (e) => {
   if (!R.started || R.modal) return;
   Snd.init();
   const p = toLogical(e);
   const h = hitAt(p);
-  const walkFloor = () => { if (p.y > WALK_Y0 - 30 || R.view === 'cafe') walkTo(p.x, p.y); };
+  const walkFloor = () => { if (p.y > GROUND + 4 || R.view === 'cafe') walkTo(p.x, p.y); };
   if (!h) { if (R.view !== 'fish') walkFloor(); return; }
-  if (h.kind === 'portal') { const pt = portalsFor().find((q) => q.side === h.side); walkTo(h.x + h.w / 2, WALK_Y0 + 20, () => pt?.go()); return; }
+  if (h.kind === 'portal') { const pt = portalsFor().find((q) => q.side === h.side); walkTo(h.x + h.w / 2, FRONT_Y + 10, () => pt?.go()); return; }
   if (R.view === 'street') {
     const i = h.i, f = frontOf(i ?? 0);
     if (h.kind === 'cash') walkTo(f.x, f.y, () => collect(S.cur, i));
