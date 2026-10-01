@@ -1069,3 +1069,14 @@ button.slot-cell:hover { filter: brightness(1.08); }
 .theme-card b { font: 800 15px/1.1 var(--font-display); }
 .theme-card small { color: var(--paper-2); }
 .slot-cell .x2 { position: absolute; top: 6px; right: 6px; background: var(--straw); color: var(--ink); border: 2px solid var(--ink); border-radius: 8px; font: 800 12px/1 var(--font-display); padding: 3px 5px 2px; }
+
+/* giỏ hàng ở chợ đầu mối */
+.cart-q { min-width: 34px; text-align: center; font: 800 19px/1 var(--font-display); font-variant-numeric: tabular-nums; color: var(--muted); align-self: center; }
+.cart-q.on { color: var(--ink); }
+.r-btns .mini:disabled { opacity: 0.45; cursor: not-allowed; }
+.cart-bar { position: sticky; bottom: -22px; margin: 12px -22px -22px; padding: 12px 22px; display: flex; gap: 12px; align-items: center; background: var(--paper-2); border-top: 2px solid var(--ink); }
+.cart-bar.on { background: #fff; }
+.cart-sum { flex: 1; min-width: 0; }
+.cart-sum b { font: 800 19px/1.1 var(--font-display); font-variant-numeric: tabular-nums; }
+.cart-bar .btn { min-width: 0; padding-inline: 18px; }
+.cart-bar .btn:disabled, .cart-bar .mini:disabled { opacity: 0.45; cursor: not-allowed; }

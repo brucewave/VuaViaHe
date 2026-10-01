@@ -611,18 +611,36 @@ function buyStreet2() {
 }
 
 // ---------- Chợ đầu mối, kho, nợ ----------
-function buy(id, n) {
-  const price = wholesale(id);
+// Giỏ hàng ở chợ: bấm +/− chỉ bỏ vào giỏ, bấm Thanh toán mới trả tiền và chở về kho.
+const cartQty = (id) => R.cart?.[id] || 0;
+const cartCount = () => Object.values(R.cart || {}).reduce((a, n) => a + n, 0);
+const cartCost = () => Object.entries(R.cart || {}).reduce((a, [id, n]) => a + n * wholesale(id), 0);
+// mua chịu thì chủ mối ghi sổ thêm CREDIT_FEE tiền lời trên phần chưa trả
+const buyBudget = () => S.money + (R.credit ? Math.max(0, creditLimit() - S.debt) / (1 + CREDIT_FEE) : 0);
+function addCart(id, n) {
+  R.cart ||= {};
+  const have = cartQty(id);
   const ms = stallOfGood(id);
   if (ms && bargBanned(ms.id)) { toast(`${ms.owner} đang giận, không bán cho bạn. Chờ chợ đổi giá sỉ đã.`, 'bad'); Snd.bad(); return; }
-  const space = khoCap() - khoCount();
-  if (space <= 0) { toast('Kho đầy rồi! Nâng cấp kho hoặc bày bớt ra gian.', 'bad'); Snd.bad(); return; }
-  // mua chịu thì chủ mối ghi sổ thêm CREDIT_FEE tiền lời trên phần chưa trả
-  const room = R.credit ? Math.max(0, creditLimit() - S.debt) / (1 + CREDIT_FEE) : 0;
-  const afford = Math.floor((S.money + room) / price);
+  if (Number(n) < 0) { R.cart[id] = Math.max(0, have + Number(n)); if (!R.cart[id]) delete R.cart[id]; Snd.click(); refreshModal(); return; }
+  const price = wholesale(id);
+  const space = khoCap() - khoCount() - cartCount();
+  const afford = Math.floor((buyBudget() - cartCost()) / price);
   const k = Math.min(n === 'max' ? Infinity : Number(n), space, afford);
-  if (k <= 0) { toast(R.credit ? 'Hết hạn mức mua chịu rồi!' : 'Không đủ tiền. Bật <b>Mua chịu</b> để ghi sổ nợ (có tính lời).', 'bad'); Snd.bad(); return; }
-  let cost = k * price;
+  if (k <= 0) {
+    if (space <= 0) toast(khoCount() >= khoCap() ? 'Kho đầy rồi! Nâng cấp kho hoặc bày bớt ra gian.' : 'Giỏ đã đủ chỗ trống trong kho rồi.', 'bad');
+    else toast(R.credit ? 'Hết hạn mức mua chịu rồi!' : 'Không đủ tiền. Bật <b>Mua chịu</b> để ghi sổ nợ (có tính lời).', 'bad');
+    Snd.bad(); return;
+  }
+  R.cart[id] = have + k;
+  Snd.click(); refreshModal();
+}
+function checkout() {
+  const items = Object.entries(R.cart || {}).filter(([, n]) => n > 0);
+  if (!items.length) return;
+  if (cartCount() > khoCap() - khoCount()) { toast('Kho không đủ chỗ cho cả giỏ. Bớt hàng trong giỏ hoặc nâng kho.', 'bad'); Snd.bad(); return; }
+  let cost = cartCost();
+  if (cost > buyBudget()) { toast(R.credit ? 'Vượt hạn mức mua chịu rồi! Bớt hàng trong giỏ.' : 'Không đủ tiền. Bớt hàng hoặc bật <b>Mua chịu</b>.', 'bad'); Snd.bad(); return; }
   const fromCash = Math.min(S.money, cost);
   S.money -= fromCash; cost -= fromCash;
   if (cost > 0) {
@@ -631,7 +649,10 @@ function buy(id, n) {
     S.debt += owe;
     toast(`Ghi sổ nợ <b>${fmt(owe)}</b>, trong đó ${fmt(owe - cost)} là tiền lời mua chịu. Nợ còn tính lãi 5% mỗi 5 phút.`);
   }
-  S.kho[id] = (S.kho[id] || 0) + k;
+  const n = cartCount();
+  for (const [id, k] of items) S.kho[id] = (S.kho[id] || 0) + k;
+  R.cart = {};
+  toast(`Đã nhập <b>${n} món</b> về kho.`, 'good');
   questProgress('buy');
   Snd.buy();
   refreshModal();
@@ -3208,7 +3229,7 @@ function openModal(title, html, opts = {}) {
 function closeModal() {
   if ($('modal').hidden) return;
   $('modal').hidden = true;
-  R.modal = null; R.modalArg = null;
+  R.modal = null; R.modalArg = null; R.cart = {};
 }
 const MODAL_HTML = { market: () => marketHTML(R.modalArg), debt: () => debtHTML(), fun: () => funHTML(), kho: () => khoHTML(), gian: () => gianHTML(...R.modalArg), neighbors: () => neighborsHTML(),
   fashion: () => fashionHTML(), news: () => newsHTML(), cafe: () => cafeHTML(), street2: () => street2HTML(),
@@ -3238,7 +3259,7 @@ function marketHTML(cat) {
     const perMin = Math.round(60 / g.t * (g.sell - g.buy));
     const p = wholesale(id), off = p < S.prices[id];
     const btns = locked ? `<span class="lock">Cấp ${g.lvl}</span>` : banned ? `<span class="lock">${ms.owner} giận</span>`
-      : [10, 50].map((n) => `<button class="mini" data-buy="${id}" data-n="${n}">+${n}</button>`).join('') + `<button class="mini max" data-buy="${id}" data-n="max">Tối đa</button>`;
+      : `<button class="mini" data-buy="${id}" data-n="-10" ${cartQty(id) ? '' : 'disabled'}>−10</button><span class="cart-q${cartQty(id) ? ' on' : ''}">${cartQty(id)}</span><button class="mini" data-buy="${id}" data-n="10">+10</button><button class="mini max" data-buy="${id}" data-n="max">Tối đa</button>`;
     return `<div class="row ${locked || banned ? 'locked' : ''}">
       <div class="r-icon">${g.icon}</div>
       <div class="r-name"><b>${g.name}${id === hotGood() ? ' <span class="hot-tag">Hot hôm nay</span>' : ''}</b><small>Bán lẻ ${fmt(g.sell)} · ~${g.t} giây/món · lời ~${fmtK(perMin)}/phút mỗi gánh${M ? '' : ` · ${ms.owner}`}</small></div>
@@ -3266,7 +3287,20 @@ function marketHTML(cat) {
       <button class="mini ${R.credit ? 'on' : ''}" data-act="credit">${R.credit ? 'Đang mua chịu' : 'Mua chịu'}</button>
       <button class="mini" data-act="repay" ${S.debt && S.money ? '' : 'disabled'}>Trả nợ</button>
       <small>Mua chịu bị ghi thêm 10% tiền lời, nợ còn lãi 5% mỗi 5 phút${S.debt ? ` (lần tới sau ${interestIn()}: +${fmt(S.debt * 0.05)})` : ''}. Vượt 130% hạn mức là chủ mối tới siết nợ. Giá sỉ đổi sau ${mins} phút. ${areaPeak('market') ? '<b>Đang chợ sớm: giá sỉ rẻ hơn 10%.</b>' : AREA_TIME.market.text + '.'}</small>
-    </div>${barg}${M ? '' : '<p class="empty-note" style="margin:0 0 8px">Muốn trả giá thì ghé từng sạp mối trong chợ.</p>'}<div class="rows">${rows}</div>`;
+    </div>${barg}${M ? '' : '<p class="empty-note" style="margin:0 0 8px">Muốn trả giá thì ghé từng sạp mối trong chợ.</p>'}<div class="rows">${rows}</div>${cartBarHTML()}`;
+}
+function cartBarHTML() {
+  const n = cartCount(), cost = cartCost(), short = cost - S.money;
+  const over = cost > buyBudget(), full = n > khoCap() - khoCount();
+  const note = !n ? 'Bấm +10 hoặc Tối đa để bỏ hàng vào giỏ, rồi bấm Thanh toán.'
+    : full ? 'Kho không đủ chỗ cho cả giỏ.'
+    : over ? (R.credit ? 'Vượt hạn mức mua chịu.' : `Thiếu ${fmt(short)}. Bớt hàng hoặc bật Mua chịu.`)
+    : short > 0 ? `Tiền mặt thiếu ${fmt(short)}, phần còn lại ghi sổ nợ (+10% lời).` : `Còn lại ${fmt(S.money - cost)} tiền mặt.`;
+  return `<div class="cart-bar${n ? ' on' : ''}">
+    <div class="cart-sum"><span>Giỏ hàng: <b>${n} món</b> · Tổng <b>${fmt(cost)}</b></span><small>${note}</small></div>
+    <button class="mini" data-act="cart-clear" ${n ? '' : 'disabled'}>Bỏ giỏ</button>
+    <button class="btn green" data-act="checkout" ${n && !over && !full ? '' : 'disabled'}>Thanh toán</button>
+  </div>`;
 }
 const interestIn = () => { const s = Math.max(0, Math.ceil((300000 - (now() - S.debtAt)) / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 function khoHTML() {
@@ -3442,7 +3476,7 @@ $('modal-body').addEventListener('click', (e) => {
   if (R.modal === 'mock' && d.mock) return onMockAct(d.mock);
   if (R.modal === 'bike') { const r = onBikeAct(d); if (r === true) refreshModal(); if (r !== null) return; }
   const [si, i] = Array.isArray(R.modalArg) ? R.modalArg : [];
-  if (d.buy) return buy(d.buy, d.n);
+  if (d.buy) return addCart(d.buy, d.n);
   if (d.reply) { replyReview(Number(d.rid), d.reply); refreshModal(); renderTop(); return; }
   if (d.barg) { bargain(R.modalArg, Number(d.barg)); refreshModal(); return; }
   if (d.visit) return visitNeighbor(d.visit);
@@ -3468,6 +3502,8 @@ $('modal-body').addEventListener('click', (e) => {
   else if (d.wear) { const f = FASHION[d.wear]; S.outfit[f.slot] = S.outfit[f.slot] === d.wear ? null : d.wear; Snd.click(); }
   else switch (d.act) {
     case 'credit': R.credit = !R.credit; Snd.click(); break;
+    case 'checkout': checkout(); break;
+    case 'cart-clear': R.cart = {}; Snd.click(); break;
     case 'repay': repayDebt(); break;
     case 'kho': upgradeKho(); break;
     case 'autostock': autoStock(); break;
