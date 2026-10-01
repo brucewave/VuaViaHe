@@ -13,14 +13,16 @@ Mở `http://localhost:5173`. Game tự lưu trong trình duyệt (localStorage)
 
 ## Lối chơi
 
-- **10 khu phố**, mỗi khu một màn hình: phía sau là bờ tường thấp, vỉa hè sâu bày 2 hàng × 3 lô = 6 sạp, mặt đường rộng. Lô mở lần lượt từng ô (hàng 1 rồi hàng 2); thuê đủ 6 lô mới mở khu phố kế tiếp. KP5 và KP10 là phố VIP: dãy nhà lớn phía sau, bán nhanh hơn.
+- **10 khu phố**, mỗi khu một màn hình: vỉa hè sâu bày 2 hàng × 3 lô, mặt đường rộng. Lô mở lần lượt từng ô (hàng 1 rồi hàng 2); thuê đủ 6 lô mới mở khu phố kế tiếp.
+- **Phố mặt tiền (KP5–KP10)**: phía sau là dãy nhà phố; 3 lô hàng 1 là tiệm cho thuê mặt bằng. Thuê rồi mở tiệm hớt tóc, sửa xe, cơm tấm, tạp hóa, điện thoại, cà phê, tiệm vàng — không cần nhập hàng, có nhân viên đứng tiệm, khách ra vào, thu nhập cao hơn sạp, nâng cấp tới cấp 5.
 - **Sự kiện trên đường**: xe chạy ngang xả rác lên vỉa hè; xe ba gác chở bia vấp ổ gà đổ hàng, có thể lụm (mất uy tín) hoặc phụ nhặt giùm (được bo, tăng uy tín).
 - **Sạp chở trên xe máy**: bấm xe máy để mở tủ sạp, chọn sạp rồi chọn lô trống; một cô hoặc một anh bán hàng chạy ra đứng sạp và rao. Mỗi sạp có 6 ô hàng bán song song; nâng cấp gánh → xe đẩy → sạp gỗ → ki-ốt để mở thêm ô.
 - **Nhân vật** đi tự do trên vỉa hè (bấm chuột, phím mũi tên hoặc WASD). Bấm gian, đồng xu, rác thì nhân vật đi tới rồi mới làm.
 - **Chợ đầu mối**: 4 sạp mối hàng, bảng giá sỉ, Ông Chủ Mối cho mua chịu (nợ có lãi, quá hạn mức bị siết nợ).
 - **Nhà riêng**: tủ đồ, kho hàng, hộp thư, Ông Tư chỉ đường lúc mới chơi và cho thuê lô mới; xe máy, trạm xe buýt.
 - **Hàng xóm**: dọn giúp để thân, hoặc làm gian thương (chôm két, vứt rác, thả chuột).
-- **Công an phường** và **dân anh chị** đòi bảo kê.
+- **Công an phường** và **dân anh chị** đòi bảo kê (có tiệm thì bị đòi nhiều hơn).
+- **Sự kiện nhỏ** cứ 1–2 phút một lần: thanh tra vệ sinh thực phẩm, khách ăn quỵt, YouTuber ẩm thực quay clip (bán ×2–×3), đoàn du khách (cả phố bán ×2), trời mưa (sạp không dù bán chậm), cô bán vé số, chó hoang tha hàng (bấm để đuổi), kẻ móc túi (bấm để bắt).
 - **Hồ câu**: thả câu, phao chìm hẳn mới giật, 10 loại cá, sổ câu.
 - **Quán cà phê**: chỗ tụ tập có chat, bấm vào người khác để sang nhà; **góc giải trí** có Vòng quay, Bầu cua, Bài cào (tiền trong game).
 - Khung hình tự co giãn theo màn hình, màn rộng thì cảnh mở rộng sang hai bên.

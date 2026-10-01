@@ -240,7 +240,7 @@ const R = {
   cafeSay: {}, cafeT: 0,
   clouds: Array.from({ length: 6 }, () => ({ x: rand(0, W), y: rand(40, 200), s: rand(0.6, 1.4) })),
   stars: Array.from({ length: 60 }, () => ({ x: rand(0, W), y: rand(0, 300), r: rand(0.6, 1.6) })),
-  credit: false, unread: 0, runners: [], cries: {}, placing: null, bikeSel: null, bikePage: 0,
+  credit: false, unread: 0, runners: [], cries: {}, guests: [], actor: null, boost: null, rain: null, placing: null, bikeSel: null, bikePage: 0,
   fish: { state: 'idle', t: 0, fx: 780, fy: 560, nib: 0, catch: null },
   chat: [],
   ripples: [],
@@ -342,7 +342,7 @@ function toast(msg, kind = '') {
 // ---------- Mô phỏng bán hàng ----------
 function tickGians(dt, visual) {
   S.streets.forEach((st, si) => st.gians.forEach((G, i) => {
-    const m = gianMult(G, si);
+    const m = gianMult(G, si) * eventMult(si, i);
     if (!m) return;
     const had = gQty(G) > 0;
     const show = visual && R.view === 'street' && S.cur === si;
@@ -399,7 +399,7 @@ function applyOffline(sec) {
   const before = allGians().reduce((a, x) => a + x.g.cash, 0);
   const sold0 = S.stats.sold;
   let left = Math.min(sec, 8 * 3600);
-  while (left > 0) { const d = Math.min(60, left); tickGians(d, false); tickNeighbors(d); left -= d; }
+  while (left > 0) { const d = Math.min(60, left); tickGians(d, false); tickShops(d, false); tickNeighbors(d); left -= d; }
   regenEnergy();
   const acts = Math.min(4, Math.floor(sec / 240));
   for (let i = 0; i < acts; i++) neighborActs(true);
@@ -533,10 +533,10 @@ function rentGian(si, i) {
   if (S.money < cost) { toast(`Cần ${fmt(cost)} để thuê gian.`, 'bad'); return; }
   S.money -= cost; S.streets[si].gians[i].open = true;
   Snd.level();
-  toast(`Thuê được ${lotName(i)}! Bấm xe máy chọn sạp đem ra bày.`, 'gold');
+  toast(isShopLot(si, i) ? 'Thuê được mặt bằng! Chọn ngành nghề để khai trương.' : `Thuê được ${lotName(i)}! Bấm xe máy chọn sạp đem ra bày.`, 'gold');
   news(`Bạn vừa thuê ${lotName(i)} ở khu phố ${si + 1}.`, 'good');
   closeModal();
-  if (S.streets[si].gians.every((g) => g.open) && si + 1 < KP_COUNT) { toast(`Thuê đủ 6 lô ${kpLabel(si)}! <b>${kpLabel(si + 1)}</b> đã mở${isVip(si + 1) ? ', là phố VIP nữa' : ''}.`, 'gold'); news(`${kpLabel(si + 1)} mở cửa cho bạn thuê lô.`, 'good'); }
+  if (S.streets[si].gians.every((g) => g.open) && si + 1 < KP_COUNT) { toast(`Thuê đủ 6 lô ${kpLabel(si)}! <b>${kpLabel(si + 1)}</b> đã mở${isVip(si + 1) ? ', là phố mặt tiền: thuê được tiệm phía sau để làm ăn' : ''}.`, 'gold'); news(`${kpLabel(si + 1)} mở cửa cho bạn thuê lô.`, 'good'); }
   renderDock();
 }
 function upgradeStall(si, i) {
@@ -741,7 +741,7 @@ function policePenalty() {
 }
 function startThug() {
   const name = pick(THUGS);
-  const demand = 10000 + 4000 * S.level;
+  const demand = 10000 + 4000 * S.level + 30000 * allGians().filter(({ g }) => g.biz).length;   // có tiệm thì đòi nhiều hơn
   const power = 4 + S.level * 1.2;
   const me = 3 + stat('health') * 2;
   const chance = clamp(me / (me + power), 0.05, 0.9);
@@ -777,7 +777,7 @@ function resolveThug(choice) {
     toast(`Bạn đứng thẳng lưng, ${T.name} chột dạ bỏ đi! Uy tín tăng.`, 'good');
     news(`Bạn không đóng tiền bảo kê, đuổi được <b>${T.name}</b>.`, 'good');
   } else {
-    const tgt = pick(allGians().filter(({ g }) => g.placed && !g.broken));
+    const tgt = pick(allGians().filter(({ g }) => (g.placed || g.biz) && !g.broken));
     if (tgt) { tgt.g.broken = true; tgt.g.cash = 0; }
     Snd.bad();
     toast(`${T.name} cho đàn em đập phá sạp ở ${tgt ? lotName(tgt.i) : 'khu phố'}! Phải sửa mới bán được.`, 'bad');
@@ -1018,7 +1018,7 @@ function placeMe(x, y) {
 function enterView(view, opts = {}) {
   R.view = view;
   R.busOut = null;
-  R.placing = null; R.spill = null;
+  R.placing = null; R.spill = null; R.actor = null; R.guests = [];
   if (view !== 'neighbor') R.visit = null;
   R.walkers = []; R.buyers = []; R.visitors = []; R.bikes = [];
   closeModal();
@@ -1452,7 +1452,7 @@ const ST_WALK = { y0: 314, y1: 576 };
 const LOT_XS = [250, 640, 1030];
 const ROW_BASE = [404, 508];
 const VIP_KP = [4, 9];                          // KP5 và KP10 là phố VIP: nhà lớn phía sau, bán nhanh hơn
-const isVip = (si) => VIP_KP.includes(si);
+const isVip = (si) => si >= 4;   // từ KP5: phố mặt tiền, có dãy nhà và tiệm cho thuê
 const lotRow = (i) => (i < 3 ? 0 : 1);
 const lotX = (i) => LOT_XS[i % 3] + (i < 3 ? 0 : 50);
 const lotBase = (i) => ROW_BASE[lotRow(i)];
@@ -1632,6 +1632,335 @@ function drawRoad(hits) {
   for (const b of R.bikes) if (b.sayT > 0 && b.say) bubble(b.say, b.x, b.y - 108, { size: 14 });
 }
 
+// ---------- Phố mặt tiền (từ Khu phố 5): thuê tiệm để làm ăn ----------
+// Ở KP5 trở đi, 3 lô hàng 1 là 3 căn tiệm phía sau vỉa hè. Thuê mặt bằng rồi chọn ngành nghề.
+// Tiệm không cần nhập hàng: khách tự vô, tiền vào két đều đặn và cao hơn sạp.
+const SHOP_FROM = 4;
+const isShopKP = (si) => si >= SHOP_FROM;
+const isShopLot = (si, li) => isShopKP(si) && li < 3;
+const SHOP_TYPES = {
+  hot_toc:   { name: 'Tiệm hớt tóc',    short: 'HỚT TÓC',     icon: '💈', price: 1500000, lvl: 9,  rate: 900,  color: '#1F6F8B', props: ['💈', '✂️', '🪑'] },
+  sua_xe:    { name: 'Tiệm sửa xe',     short: 'SỬA XE',      icon: '🔧', price: 2000000, lvl: 9,  rate: 1200, color: '#2E7D4F', props: ['🔧', '🛞', '🛵'] },
+  com_tam:   { name: 'Quán cơm tấm',    short: 'CƠM TẤM',     icon: '🍛', price: 2500000, lvl: 10, rate: 1500, color: '#C0392B', props: ['🍛', '🍳', '🥢'] },
+  tap_hoa:   { name: 'Tiệm tạp hóa',    short: 'TẠP HÓA',     icon: '🛒', price: 3000000, lvl: 11, rate: 1800, color: '#D98E04', props: ['🥫', '🧴', '🍜'] },
+  dien_thoai:{ name: 'Tiệm điện thoại', short: 'ĐIỆN THOẠI',  icon: '📱', price: 3500000, lvl: 12, rate: 2100, color: '#7A3E9D', props: ['📱', '🔋', '🎧'] },
+  ca_phe_t:  { name: 'Quán cà phê',     short: 'CÀ PHÊ',      icon: '☕', price: 4000000, lvl: 13, rate: 2400, color: '#6B3E26', props: ['☕', '🧋', '🍰'] },
+  tiem_vang: { name: 'Tiệm vàng',       short: 'TIỆM VÀNG',   icon: '💍', price: 8000000, lvl: 15, rate: 5000, color: '#B8860B', props: ['💍', '📿', '⚖️'] },
+};
+const SHOP_MAX_LVL = 5;
+const shopRateMul = (lv) => 1 + 0.6 * (lv - 1);
+const shopUpCost = (G) => Math.round(SHOP_TYPES[G.biz].price * 0.6 * G.bizLvl);
+function shopRate(G, si) {
+  if (!G.biz || G.broken) return 0;
+  let m = shopRateMul(G.bizLvl) * (1 - 0.12 * Math.min(3, G.trash)) * (1 + stat('beauty') * 0.02) * (1 + (si - SHOP_FROM) * 0.06) * eventMult(si, null);
+  const h = realHour();
+  if (h < 6 || h >= 23) m *= 0.3;
+  return SHOP_TYPES[G.biz].rate * m;   // đồng mỗi giây
+}
+function tickShops(dt, visual) {
+  S.streets.forEach((st, si) => st.gians.forEach((G, li) => {
+    if (!G.biz) return;
+    G.cash += shopRate(G, si) * dt;
+    if (visual && si === S.cur && R.view === 'street' && Math.random() < dt / 7) spawnShopGuest(li);
+  }));
+}
+function openBiz(si, li, type) {
+  const G = S.streets[si].gians[li], T = SHOP_TYPES[type];
+  if (G.biz || S.level < T.lvl || S.money < T.price) return;
+  S.money -= T.price;
+  G.biz = type; G.bizLvl = 1; G.cash = 0; G.clerk = randomSeller();
+  Snd.level();
+  toast(`Khai trương <b>${T.name}</b>! ${G.clerk.name} đứng tiệm giùm bạn.`, 'gold');
+  news(`Bạn khai trương ${T.name} ở ${kpLabel(si)}.`, 'good');
+}
+function upgradeBiz(si, li) {
+  const G = S.streets[si].gians[li];
+  if (!G.biz || G.bizLvl >= SHOP_MAX_LVL) return;
+  const c = shopUpCost(G);
+  if (S.money < c) return;
+  S.money -= c; G.bizLvl++;
+  Snd.level(); toast(`${SHOP_TYPES[G.biz].name} lên cấp ${G.bizLvl}, khách đông hơn!`, 'gold');
+}
+function closeBiz(si, li) {
+  const G = S.streets[si].gians[li];
+  if (!G.biz) return;
+  collect(si, li, true);
+  const back = Math.round(SHOP_TYPES[G.biz].price * 0.4);
+  S.money += back;
+  toast(`Sang lại tiệm, thu về ${fmt(back)}. Mặt bằng trống, chọn ngành khác được.`);
+  G.biz = null; G.bizLvl = 0; G.clerk = null;
+}
+function shopHTML(si, li) {
+  const G = S.streets[si].gians[li];
+  if (!G.biz) {
+    const cards = Object.entries(SHOP_TYPES).map(([id, T]) => {
+      const locked = S.level < T.lvl;
+      return `<div class="card${locked ? ' locked' : ''}"><b class="c-name">${T.icon} ${T.name}</b><span class="c-stats">~${fmtK(T.rate * 60)}/phút · không cần nhập hàng</span>
+        <div class="c-foot"><span class="c-price">${fmt(T.price)}</span>${locked ? `<span class="lock">Cần cấp ${T.lvl}</span>` : `<button class="mini" data-biz="${id}" ${S.money < T.price ? 'disabled' : ''}>Mở tiệm</button>`}</div></div>`;
+    }).join('');
+    return `<p class="event-text">Mặt bằng ${lotName(li)} ở ${kpLabel(si)} đang trống. Chọn ngành nghề để khai trương. Có mặt bằng thì khách tự vô, không phải nhập hàng, thu nhập cao hơn bày sạp.</p>
+      <div class="cards">${cards}</div>`;
+  }
+  const T = SHOP_TYPES[G.biz], rate = shopRate(G, si);
+  const up = G.bizLvl < SHOP_MAX_LVL ? shopUpCost(G) : 0;
+  return `<div class="gian-panel">
+    <div class="cab-wrap"><div class="shop-hero" style="--c:${T.color}"><span class="shop-ic">${T.icon}</span><b>${T.name}</b><small>Cấp ${G.bizLvl}/${SHOP_MAX_LVL} · ${G.clerk?.name || ''} đứng tiệm</small><span class="shop-props">${T.props.join(' ')}</span></div></div>
+    <div class="gian-side">
+      <div class="gian-card">
+        <div class="kv"><span>Thu nhập</span><b>${rate ? '~' + fmtK(rate * 60) + '/phút' : 'Đang nghỉ'}</b></div>
+        <div class="kv"><span>Tiền trong két</span><b>${fmt(G.cash)}</b></div>
+        <div class="flags">${G.trash ? `<span class="flag-chip bad">Rác ×${G.trash}</span>` : ''}${G.broken ? '<span class="flag-chip bad">Bị đập phá</span>' : ''}<span class="flag-chip ok">Có mặt bằng, khỏi lo công an</span></div>
+        <div class="btn-row">
+          <button class="btn" data-act="collect" ${G.cash > 0 ? '' : 'disabled'}>Thu tiền</button>
+          ${G.trash ? '<button class="btn paper" data-act="clean">Dọn rác</button>' : ''}
+          ${G.broken ? `<button class="btn red" data-act="repair" ${S.money < repairCost() ? 'disabled' : ''}>Sửa tiệm · ${fmt(repairCost())}</button>` : ''}
+        </div>
+      </div>
+      ${up ? `<button class="btn green" data-act="bizup" ${S.money < up ? 'disabled' : ''}>Nâng cấp tiệm · ${fmt(up)}<small>Thu nhập ×${String(shopRateMul(G.bizLvl + 1)).replace('.', ',')}</small></button>` : '<span class="tag">Tiệm đã cấp tối đa</span>'}
+      <button class="btn paper" data-act="bizclose">Sang lại tiệm (thu về 40% vốn)</button>
+    </div></div>`;
+}
+// khách vô tiệm (chỉ để nhìn cho vui)
+function spawnShopGuest(li) {
+  if (R.guests.length > 6) return;
+  const fromLeft = Math.random() < 0.5;
+  R.guests.push({ li, x: fromLeft ? R.cam - 40 : R.cam + W + 40, y: rand(330, 360), dir: fromLeft ? 1 : -1, look: makeLook(), speed: rand(120, 160), phase: 0, moving: true, state: 'in' });
+}
+function updateGuests(dt) {
+  for (const g of R.guests) {
+    const tx = lotX(g.li), ty = ST_GROUND + 18;
+    if (g.state === 'in') {
+      const dx = tx - g.x, dy = ty - g.y, d = Math.hypot(dx, dy);
+      if (d < 4) { g.state = 'gone'; R.parts.push({ type: 'text', x: tx, y: ST_GROUND - 140, vy: -30, text: '+khách', color: '#DDF2C9', life: 1, max: 1, small: true }); }
+      else { const s = Math.min(1, (g.speed * dt) / d); g.x += dx * s; g.y += dy * s; g.dir = Math.sign(dx) || g.dir; g.phase += dt * 9; }
+    }
+  }
+  R.guests = R.guests.filter((g) => g.state !== 'gone' && R.view === 'street');
+}
+// vẽ mặt tiền tiệm đè lên tầng trệt dãy nhà
+function drawShopFront(cx, G, i, si, hits, nl) {
+  const w = 330, top = ST_GROUND - 132, x0 = cx - w / 2;
+  if (!G.open) {
+    ctx.fillStyle = '#A3ABB0'; ctx.fillRect(x0, top + 30, w, 102);
+    ctx.strokeStyle = 'rgba(0,0,0,.18)'; ctx.lineWidth = 1; ctx.beginPath(); for (let k = top + 34; k < ST_GROUND; k += 5) { ctx.moveTo(x0, k); ctx.lineTo(x0 + w, k); } ctx.stroke();
+    ctx.fillStyle = '#6E6A64'; ctx.fillRect(x0 - 4, top + 24, w + 8, 10);
+    const next = nl && nl.si === si && nl.li === i;
+    ctx.fillStyle = next ? '#FFF4D6' : '#E3E0D8'; rr(ctx, cx - 110, top + 50, 220, 58, 6); ctx.fill(); ctx.strokeStyle = '#231A14'; ctx.lineWidth = 2.5; ctx.stroke();
+    signText(ctx, 'CHO THUÊ MẶT BẰNG', cx, top + 68, 17, '#C0392B', 206);
+    if (next) {
+      const [cost, lvl] = gianCost(si, i);
+      ctx.font = '700 14px "Be Vietnam Pro", sans-serif'; ctx.fillStyle = '#231A14'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(S.level < lvl ? `Cần cấp ${lvl}` : fmt(cost), cx, top + 92);
+      hits.push({ x: x0, y: top, w, h: 142, kind: 'gian', i, pri: 1 });
+    } else { ctx.font = '600 12px "Be Vietnam Pro", sans-serif'; ctx.fillStyle = '#7A6552'; ctx.fillText('Chưa tới lượt thuê', cx, top + 92); }
+    return;
+  }
+  const T = G.biz ? SHOP_TYPES[G.biz] : null;
+  // tường, cửa, mái hiên
+  ctx.fillStyle = '#3B2E2A'; ctx.fillRect(x0 + 10, top + 40, w - 20, 92);
+  if (T) {
+    ctx.fillStyle = T.color; rr(ctx, x0, top, w, 34, 6); ctx.fill(); ctx.strokeStyle = '#231A14'; ctx.lineWidth = 2.5; ctx.stroke();
+    signText(ctx, `${T.short} · ${S.player.name.toUpperCase()}`, cx, top + 17, 19, '#FFF4D6', w - 20);
+    for (let k = 0; k < 10; k++) { ctx.fillStyle = k % 2 ? '#FFF4D6' : T.color; ctx.beginPath(); ctx.moveTo(x0 + k * 33, top + 34); ctx.lineTo(x0 + (k + 1) * 33, top + 34); ctx.lineTo(x0 + (k + 1) * 33 + 4, top + 52); ctx.lineTo(x0 + k * 33 + 4, top + 52); ctx.closePath(); ctx.fill(); }
+    // đồ đạc trong tiệm
+    ctx.fillStyle = 'rgba(255,220,140,.25)'; ctx.fillRect(x0 + 14, top + 56, w - 28, 72);
+    T.props.forEach((ic, k) => emoji(ctx, ic, x0 + 60 + k * 80, top + 96, 30));
+    ctx.fillStyle = '#8C6A4A'; ctx.fillRect(x0 + 20, top + 112, w - 40, 10);
+    drawPerson(ctx, { x: cx + 110, y: ST_GROUND + 4, dir: -1, look: { ...sellerLookFor(G.clerk), scale: 0.78 }, moving: false, phase: 0 });
+    for (let k = 0; k < G.bizLvl; k++) { ctx.fillStyle = '#F7C948'; ctx.beginPath(); ctx.arc(x0 + 14 + k * 14, top - 8, 5, 0, 7); ctx.fill(); ctx.strokeStyle = '#8C6A12'; ctx.lineWidth = 1.5; ctx.stroke(); }
+  } else {
+    ctx.fillStyle = '#E3E0D8'; rr(ctx, x0, top, w, 34, 6); ctx.fill(); ctx.strokeStyle = '#231A14'; ctx.lineWidth = 2; ctx.stroke();
+    signText(ctx, 'MẶT BẰNG TRỐNG · CHỌN NGÀNH NGHỀ', cx, top + 17, 15, '#7A6552', w - 20);
+    ctx.fillStyle = 'rgba(255,244,214,.18)'; ctx.fillRect(x0 + 14, top + 56, w - 28, 72);
+  }
+  ctx.strokeStyle = '#231A14'; ctx.lineWidth = 2; ctx.strokeRect(x0 + 10, top + 40, w - 20, 92);
+  hits.push({ x: x0, y: top - 10, w, h: 152, kind: 'gian', i, pri: 1 });
+}
+
+// ---------- Sự kiện nhỏ trong khu phố ----------
+// Cứ 1–2 phút lại có một chuyện xảy ra: thanh tra, khách quỵt, YouTuber, du khách, mưa, vé số, chó hoang, móc túi.
+const FOOD = ['tra_da', 'kem_chuoi', 'bap', 'banh_mi', 'keo_bong', 'xoi', 'nuoc_mia', 'hot_vit'];
+function eventMult(si, li) {
+  let m = 1;
+  const B = R.boost;
+  if (B && now() < B.until && (B.si == null || B.si === si) && (B.li == null || B.li === li)) m *= B.mult;
+  if (R.rain && now() < R.rain.until && li != null) { const G = S.streets[si].gians[li]; if (G && !G.du) m *= 0.5; }
+  return m;
+}
+const myPlaced = () => S.streets[S.cur].gians.map((g, i) => ({ g, i })).filter(({ g }) => g.placed && !g.sellerAway);
+const EVENTS = [
+  { id: 'thanhtra', w: 8, ok: () => myPlaced().some(({ g }) => gGoods(g).some((id) => FOOD.includes(id))), run: evThanhTra },
+  { id: 'quyt', w: 10, ok: () => myPlaced().some(({ g }) => gQty(g) > 2), run: evQuyt },
+  { id: 'review', w: 6, ok: () => myPlaced().length > 0, run: evReview },
+  { id: 'dukhach', w: 7, ok: () => myPlaced().length > 0, run: evDuKhach },
+  { id: 'mua', w: 7, ok: () => myPlaced().length > 0 && !(R.rain && now() < R.rain.until), run: evMua },
+  { id: 'veso', w: 9, ok: () => S.money >= 10000, run: evVeSo },
+  { id: 'cho', w: 9, ok: () => myPlaced().some(({ g }) => gQty(g) > 2), run: evCho },
+  { id: 'moctui', w: 8, ok: () => S.money >= 20000, run: evMocTui },
+];
+function updateEvents(dt) {
+  if (!R.started || R.attract || R.view !== 'street' || R.modal || R.dlg || R.trip || R.police) return;
+  R.nextEv = (R.nextEv ?? rand(40, 70)) - dt;
+  if (R.nextEv > 0) return;
+  R.nextEv = rand(60, 120);
+  const pool = EVENTS.filter((e) => !R.actor || !['cho', 'moctui'].includes(e.id)).filter((e) => e.ok());
+  if (!pool.length) return;
+  const total = pool.reduce((a, e) => a + e.w, 0);
+  let r = Math.random() * total;
+  for (const e of pool) if ((r -= e.w) <= 0) { e.run(); return; }
+}
+const PEOPLE = {
+  thanhtra: { skin: '#E0AC80', hair: '#1E1A1A', long: false, hat: 3, capColor: '#1F4E8C', shirt: '#E9EEF5', style: 'collar', pants: '#2F3E46', acc: 'book' },
+  khach: { skin: '#C68B5E', hair: '#2B211C', long: false, hat: 2, helmet: '#2E2E33', shirt: '#E84A5F', pants: '#3D405B' },
+  youtuber: { skin: '#F1C9A5', hair: '#D98E04', long: true, hat: 4, shirt: '#F7B32B', style: 'flower', pants: '#264653', acc: 'glasses' },
+  huongdan: { skin: '#E0AC80', hair: '#1E1A1A', long: true, hat: 3, capColor: '#C0392B', shirt: '#2A9D8F', pants: '#231A14' },
+  veso: { skin: '#C68B5E', hair: '#BBB', long: true, hat: 1, shirt: '#8E3B46', pants: '#231A14', acc: 'book' },
+};
+function evThanhTra() {
+  const dirty = myPlaced().filter(({ g }) => g.trash > 0);
+  const fine = dirty.length * (30000 + 5000 * S.level);
+  const chance = clamp(0.3 + S.karma / 100, 0.1, 0.85);
+  talk('Đoàn thanh tra', PEOPLE.thanhtra, [
+    'Đoàn kiểm tra vệ sinh an toàn thực phẩm đây. Cho xem quầy hàng coi!',
+    dirty.length ? `Trời đất, trước ${dirty.length} sạp còn rác kìa. Vậy là không đạt nha!` : 'Coi bộ quầy cũng sạch sẽ ha…',
+  ], { choices: [
+    { label: 'Mời kiểm tra', sub: dirty.length ? `Phạt ${fmt(Math.min(S.money, fine))}` : 'Sạch sẽ', fn: () => {
+      if (!dirty.length) { changeKarma(2); addXp(8); toast('Đoàn khen sạp sạch sẽ! Uy tín tăng.', 'good'); news('Thanh tra khen sạp của bạn sạch sẽ.', 'good'); return; }
+      const f = Math.min(S.money, fine); S.money -= f; S.stats.fines += f; Snd.bad(); toast(`Bị phạt vệ sinh ${fmt(f)}. Dọn rác thường xuyên nha!`, 'bad');
+    } },
+    { label: 'Xin bỏ qua lần này', sub: `Nhờ uy tín · ${Math.round(chance * 100)}%`, fn: () => {
+      if (!dirty.length || Math.random() < chance) { toast('Đoàn cười cười rồi đi. Hú hồn!', 'good'); return; }
+      const f = Math.min(S.money, fine * 2); S.money -= f; S.stats.fines += f; changeKarma(-2); Snd.bad(); toast(`Xin xỏ không được, bị phạt gấp đôi: ${fmt(f)}!`, 'bad');
+    } },
+  ] });
+}
+function evQuyt() {
+  const { g, i } = pick(myPlaced().filter(({ g }) => gQty(g) > 2));
+  const sl = g.slots.find((s, k) => k < slotsOpen(g) && s.qty > 0);
+  const n = Math.min(3, sl.qty), loss = n * unitPrice(g, sl.good);
+  sl.qty -= n;
+  const chance = clamp(0.45 + stat('health') * 0.04, 0.2, 0.9);
+  talk(g.seller?.name || 'Người bán', sellerLookFor(g.seller), [`Trời ơi! Ông khách ăn ${n} ${GOODS[sl.good].name.toLowerCase()} ở ${lotName(i)} rồi lên xe vọt mất, chưa trả tiền!`], { choices: [
+    { label: 'Rượt theo', sub: `3 sức · ${Math.round(chance * 100)}%`, fn: () => {
+      if (!useEnergy(3)) return;
+      if (Math.random() < chance) { g.cash += loss; addXp(10); changeKarma(1); Snd.coin(); toast(`Rượt kịp, ông khách xin lỗi rồi trả đủ ${fmt(loss)}!`, 'good'); }
+      else { Snd.bad(); toast('Chạy hụt hơi mà không kịp. Mất trắng!', 'bad'); }
+    } },
+    { label: 'Thôi kệ', sub: `Mất ${fmt(loss)}`, fn: () => toast('Thôi coi như làm phước.') },
+  ] });
+}
+function evReview() {
+  const { g, i } = pick(myPlaced());
+  talk('YouTuber ẩm thực', PEOPLE.youtuber, [`Hello cả nhà! Hôm nay mình review ${g.seller?.name ? 'sạp của ' + g.seller.name : 'sạp này'} ở ${lotName(i)} nè. Cho xin quay một clip nha!`], { choices: [
+    { label: 'Mời ăn thử miễn phí', sub: 'Mất 3 món · bán ×3 trong 3 phút', fn: () => {
+      const sl = g.slots.find((s, k) => k < slotsOpen(g) && s.qty > 0); if (sl) sl.qty = Math.max(0, sl.qty - 3);
+      R.boost = { si: S.cur, li: i, mult: 3, until: now() + 180000 }; addXp(6); toast(`Clip lên xu hướng! ${lotName(i)} bán gấp 3 trong 3 phút.`, 'gold');
+    } },
+    { label: 'Cứ quay đi', sub: 'Bán ×2 trong 3 phút', fn: () => { R.boost = { si: S.cur, li: i, mult: 2, until: now() + 180000 }; toast(`Có người coi clip tìm tới, ${lotName(i)} bán gấp đôi 3 phút.`, 'good'); } },
+  ] });
+}
+function evDuKhach() {
+  R.boost = { si: S.cur, li: null, mult: 2, until: now() + 90000 };
+  for (let k = 0; k < 8; k++) R.walkers.push({ x: R.cam - 40 - k * 50, y: rand(ST_WALK.y0 + 10, ST_WALK.y1), dir: 1, look: { ...makeLook(), hat: 4, skin: pick(['#F6D7C3', '#EFC3A4']), hair: pick(['#D9B26F', '#A0522D']) }, speed: rand(55, 80), phase: rand(0, 6), moving: true });
+  talk('Hướng dẫn viên', PEOPLE.huongdan, ['Cả đoàn du khách dừng chân ở đây nha! Ai muốn ăn vặt, mua quà thì ghé mấy sạp này!'], { onDone: () => toast('Đoàn du khách tới! Cả khu phố bán gấp đôi trong 1 phút rưỡi.', 'gold') });
+}
+function evMua() {
+  R.rain = { until: now() + 120000 };
+  const noDu = myPlaced().filter(({ g }) => !g.du);
+  const cost = noDu.length * 20000;
+  talk('Trời đổ mưa', playerLook(), ['Mây đen kéo tới, mưa rào rồi! Sạp nào không có dù che thì khách chạy hết.'], { choices: [
+    ...(noDu.length ? [{ label: `Mua bạt che ${noDu.length} sạp`, sub: fmt(cost), fn: () => { if (S.money < cost) { toast('Không đủ tiền mua bạt.', 'bad'); return; } S.money -= cost; for (const { g } of noDu) g.du = true; Snd.buy(); toast('Che bạt xong, mưa cứ mưa, bán cứ bán!', 'good'); } }] : []),
+    { label: 'Chịu ướt', fn: () => toast('Mưa 2 phút, sạp không dù bán chậm một nửa.') },
+  ] });
+}
+function evVeSo() {
+  talk('Cô bán vé số', PEOPLE.veso, ['Con ơi mua giùm cô tờ vé số đi, chiều nay xổ rồi nè!'], { choices: [
+    { label: 'Mua 1 tờ', sub: '10.000đ', fn: () => {
+      S.money -= 10000; changeKarma(1);
+      const r = Math.random();
+      if (r < 0.03) { S.money += 1000000; Snd.level(); toast('Trúng giải nhất đài! <b>+1.000.000đ</b>. Cô vé số mừng muốn khóc!', 'gold'); news('Bạn trúng vé số 1 triệu đồng!', 'good'); }
+      else if (r < 0.25) { S.money += 30000; Snd.coin(); toast('Trúng giải an ủi 30.000đ!', 'good'); }
+      else toast('Xổ rồi… trật hết. Coi như giúp cô bán vé số.');
+    } },
+    { label: 'Không mua', fn: () => toast('Cô vé số cười hiền rồi đi qua sạp khác.') },
+  ] });
+}
+// chó hoang chạy tới tha hàng; bấm vào nó để đuổi
+function evCho() {
+  const { i } = pick(myPlaced().filter(({ g }) => gQty(g) > 2));
+  const fromLeft = Math.random() < 0.5;
+  R.actor = { type: 'cho', li: i, x: fromLeft ? R.cam - 60 : R.cam + W + 60, y: Math.min(lotBase(i) + 16, ST_WALK.y1), dir: fromLeft ? 1 : -1, t: 0, phase: 0 };
+  toast(`Có con chó hoang đang chạy về phía ${lotName(i)}! Bấm vào nó để đuổi.`, 'bad');
+  Snd.tone(300, 0.15, 'sawtooth', 0.04); Snd.tone(260, 0.15, 'sawtooth', 0.04, 0.18);
+}
+// kẻ móc túi lân la lại gần nhân vật; bấm vào hắn để bắt
+function evMocTui() {
+  const fromLeft = R.me.x > SW / 2;
+  R.actor = { type: 'moctui', x: fromLeft ? R.cam - 60 : R.cam + W + 60, y: R.me.y, dir: fromLeft ? 1 : -1, t: 0, phase: 0 };
+  toast('Có thằng đội nón trùm đầu đang lân la lại gần… coi chừng móc túi! Bấm vào hắn để bắt.', 'bad');
+}
+function updateActor(dt) {
+  const A = R.actor;
+  if (!A) return;
+  if (R.view !== 'street') { R.actor = null; return; }
+  A.t += dt; A.phase += dt * 14;
+  if (A.state === 'flee') { A.x += A.dir * 420 * dt; if (A.x < R.cam - 120 || A.x > R.cam + W + 120) R.actor = null; return; }
+  const tx = A.type === 'cho' ? lotX(A.li) + 30 : R.me.x - A.dir * 30;
+  const ty = A.type === 'cho' ? A.y : R.me.y;
+  const dx = tx - A.x, dy = ty - A.y, d = Math.hypot(dx, dy);
+  const sp = A.type === 'cho' ? 170 : 110;
+  if (d > 6) { const s = Math.min(1, (sp * dt) / d); A.x += dx * s; A.y += dy * s; A.dir = Math.sign(dx) || A.dir; return; }
+  // tới nơi
+  if (A.type === 'cho') {
+    const G = S.streets[S.cur].gians[A.li];
+    let lost = 0;
+    for (const sl of G.slots) if (sl.qty > 0 && lost < 3) { const n = Math.min(3 - lost, sl.qty); sl.qty -= n; lost += n; }
+    Snd.bad(); toast(`Con chó tha mất ${lost} món ở ${lotName(A.li)} rồi chạy mất!`, 'bad');
+  } else {
+    const n = Math.min(200000, Math.round(S.money * 0.05));
+    S.money -= n; Snd.bad(); toast(`Bị móc túi mất ${fmt(n)}! Lần sau để ý xung quanh nha.`, 'bad'); news(`Bạn bị móc túi mất ${fmt(n)} ở ${kpLabel(S.cur)}.`, 'bad');
+  }
+  A.state = 'flee'; A.dir = A.x < SW / 2 ? -1 : 1;
+}
+function catchActor() {
+  const A = R.actor;
+  if (!A || A.state === 'flee') return;
+  if (A.type === 'cho') { if (!useEnergy(1)) return; addXp(3); toast('Xùy xùy! Đuổi được con chó hoang.', 'good'); }
+  else { S.money += 20000; changeKarma(2); addXp(8); Snd.coin(); toast('Tóm được thằng móc túi! Bà con thưởng nóng 20.000đ.', 'good'); news('Bạn bắt được một tên móc túi ở khu phố.', 'good'); }
+  A.state = 'flee'; A.dir = A.x < R.me.x ? -1 : 1;
+}
+function drawActor(layer, hits) {
+  const A = R.actor;
+  if (!A) return;
+  if (A.type === 'cho') {
+    layer.push({ y: A.y, draw: () => {
+      ctx.save(); ctx.translate(A.x, A.y); ctx.scale(A.dir, 1);
+      ctx.fillStyle = 'rgba(0,0,0,.2)'; ctx.beginPath(); ctx.ellipse(0, 0, 26, 5, 0, 0, 7); ctx.fill();
+      const leg = Math.sin(A.phase) * 5;
+      ctx.strokeStyle = '#7B4B2A'; ctx.lineWidth = 5; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(-14, -16); ctx.lineTo(-14 + leg, -2); ctx.moveTo(14, -16); ctx.lineTo(14 - leg, -2); ctx.stroke();
+      ctx.fillStyle = '#9C6B3F'; ctx.beginPath(); ctx.ellipse(0, -22, 22, 11, 0, 0, 7); ctx.fill();
+      ctx.beginPath(); ctx.arc(22, -30, 10, 0, 7); ctx.fill();
+      ctx.fillStyle = '#7B4B2A'; ctx.beginPath(); ctx.ellipse(20, -40, 4, 7, -0.4, 0, 7); ctx.fill();
+      ctx.strokeStyle = '#9C6B3F'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(-20, -24); ctx.quadraticCurveTo(-32, -38 + Math.sin(A.phase) * 4, -30, -44); ctx.stroke();
+      ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(26, -32, 1.8, 0, 7); ctx.fill();
+      ctx.restore();
+      if (A.state !== 'flee') bubble('Gâu gâu!', A.x, A.y - 56, { size: 13 });
+    } });
+    hits.push({ x: A.x - 40, y: A.y - 60, w: 80, h: 66, kind: 'actor', pri: 4 });
+  } else {
+    const look = { skin: '#C68B5E', hair: '#1E1A1A', long: false, hat: 3, capColor: '#2E2E33', shirt: '#3A3A40', pants: '#2F3E46', scale: 0.95 };
+    layer.push({ y: A.y, draw: () => { drawPerson(ctx, { x: A.x, y: A.y, dir: A.dir, look: { ...look, scale: 0.95 * personBase() * depthScale(A.y) }, moving: true, phase: A.phase }); if (A.state !== 'flee') bubble('…', A.x, A.y - 150, { size: 14 }); } });
+    hits.push({ x: A.x - 30, y: A.y - 140, w: 60, h: 146, kind: 'actor', pri: 4 });
+  }
+}
+function drawRain() {
+  if (!R.rain || now() >= R.rain.until || !isStreetView()) return;
+  ctx.strokeStyle = 'rgba(210,222,240,.55)'; ctx.lineWidth = 1.5; ctx.beginPath();
+  for (let k = 0; k < 140; k++) { const x = ((k * 97 + R.t * 220) % (W + 200)) - 100 + R.cam, y = (k * 53 + R.t * 820) % H; ctx.moveTo(x, y); ctx.lineTo(x - 5, y + 18); }
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(40,50,70,.18)'; ctx.fillRect(R.cam, 0, W, H);
+}
+
 // ---------- Sạp mang theo trên xe máy ----------
 const UNIT_FIELDS = ['stall', 'slots', 'du', 'ghe', 'bang', 'phep', 'broken', 'seller'];
 const UNIT_PRICE = (n) => Math.round((30000 * Math.pow(1.6, n)) / 1000) * 1000;
@@ -1706,7 +2035,7 @@ function pickupUnit(si, li) {
 }
 function startPlacing(k) {
   if (R.view !== 'street') { toast('Lên khu phố rồi mới bày sạp được.', 'bad'); return; }
-  const free = S.streets[S.cur].gians.some((g) => g.open && !g.placed);
+  const free = S.streets[S.cur].gians.some((g, li) => g.open && !g.placed && !isShopLot(S.cur, li));
   if (!free) { toast('Khu phố này hết lô trống. Thuê thêm lô hoặc thu bớt sạp về.', 'bad'); return; }
   R.placing = k; closeModal(); closeDialog(); renderCtx();
   toast('Bấm vào một <b>lô trống</b> (khung vàng) để bày sạp.', 'gold');
@@ -1785,7 +2114,7 @@ function bikeHTML() {
       <div class="gian-card">
         <div class="kv"><span>Sạp trên xe</span><b>${S.bike.length}</b></div>
         <div class="kv"><span>Đang bày ngoài phố</span><b>${allGians().filter(({ g }) => g.placed).length}</b></div>
-        <div class="kv"><span>Lô trống ở đây</span><b>${onStreet ? S.streets[S.cur].gians.filter((g) => g.open && !g.placed).length : '—'}</b></div>
+        <div class="kv"><span>Lô trống ở đây</span><b>${onStreet ? S.streets[S.cur].gians.filter((g, li) => g.open && !g.placed && !isShopLot(S.cur, li)).length : '—'}</b></div>
         ${u ? `<div class="kv"><span>Người bán</span><b>${u.seller.name}</b></div>` : ''}
       </div>
       ${u ? `<button class="btn big" data-act="uplace" ${onStreet ? '' : 'disabled'}>Đem ra lô bán</button>
@@ -1835,7 +2164,7 @@ function autoPlaceAll(quiet) {
   const order = [S.cur, ...Array.from({ length: S.streets.length }, (_, k) => k).filter((k) => k !== S.cur)];
   for (const si of order) {
     S.streets[si].gians.forEach((G, li) => {
-      if (!S.bike.length || !G.open || G.placed) return;
+      if (!S.bike.length || !G.open || G.placed || isShopLot(si, li)) return;
       if (si === S.cur && R.view === 'street' && !quiet) placeUnit(0, si, li);
       else placeUnitDirect(S.bike.shift(), si, li);
       placed++;
@@ -1886,6 +2215,7 @@ function mockHTML() {
       ${b('money', '+1.000.000đ')}${b('level', 'Lên 1 cấp')}${b('energy', 'Hồi đầy sức')}${b('kho', 'Kho đầy hàng', 'Mỗi món 40')}
       ${b('police', 'Công an tới', 'Đứng ở khu phố', !onStreet)}${b('thug', 'Dân anh chị tới')}${b('spill', 'Xe đổ hàng', 'Đứng ở khu phố', !onStreet)}
       ${b('nb', 'Hàng xóm quậy')}${b('time', 'Tua 10 phút', 'Hàng bán như lúc vắng')}${b('auto', 'Bày tự động')}
+      ${b('event', 'Sự kiện ngẫu nhiên', 'Đứng ở khu phố', !onStreet)}${b('shopkp', 'Mở tới phố mặt tiền', 'Thuê KP1–KP5, cấp 15, +20 triệu')}
       <button class="btn red" data-mock="reset">Xóa bản lưu, chơi lại</button>
     </div>`;
 }
@@ -1903,6 +2233,8 @@ function onMockAct(act) {
     case 'nb': neighborActs(false); toast('Hàng xóm vừa ra tay, xem Tin khu phố.'); break;
     case 'time': { const before = allGians().reduce((a, x) => a + x.g.cash, 0); applyOffline(600); R.offline = null; toast(`Tua 10 phút: két các sạp có thêm ${fmt(allGians().reduce((a, x) => a + x.g.cash, 0) - before)}.`, 'good'); break; }
     case 'auto': autoPlaceAll(); break;
+    case 'event': { closeModal(); const pool = EVENTS.filter((e) => e.ok()); if (!pool.length) { toast('Bày vài sạp ra trước đã, rồi gọi sự kiện.', 'bad'); return; } pick(pool).run(); return; }
+    case 'shopkp': S.level = Math.max(S.level, 15); S.money += 20000000; for (let si = 0; si < 5; si++) S.streets[si].gians.forEach((g) => { g.open = true; }); toast('Đã mở tới Khu phố 5 (phố mặt tiền). Ra KP5 thuê tiệm thử nha!', 'gold'); renderDock(); break;
     case 'reset': try { localStorage.removeItem(SAVE_KEY); } catch { /* bỏ qua */ } closeModal(); beginGame(true); return;
   }
   save(); refreshModal();
@@ -2222,6 +2554,7 @@ function update(dt) {
   R.t += dt;
   if (R.started) {
     tickGians(dt, true);
+    tickShops(dt, true);
     tickNeighbors(dt);
     regenEnergy();
     tickDebt();
@@ -2240,6 +2573,9 @@ function update(dt) {
   updateCrowd(dt);
   updateRunners(dt);
   updateRoad(dt);
+  updateEvents(dt);
+  updateActor(dt);
+  updateGuests(dt);
   updateMe(dt);
   if (R.edgeLock > 0) R.edgeLock -= dt;
   for (const p of R.parts) { p.life -= dt; p.x += (p.vx || 0) * dt; p.y += (p.vy || 0) * dt; if (p.type === 'coin') p.vy += 1100 * dt; }
@@ -2326,12 +2662,19 @@ function khoHTML() {
 }
 function gianHTML(si, i) {
   const G = S.streets[si].gians[i];
+  if (!G.open && isShopLot(si, i)) {
+    const [cost, lvl] = gianCost(si, i);
+    return `<p class="event-text">Mặt bằng ${lotName(i)} ở ${kpLabel(si)} đang cho thuê. Thuê rồi mở tiệm sửa xe, điện thoại, cơm tấm… Có mặt bằng thì không phải nhập hàng mà thu nhập cao hơn bày sạp.</p>
+      <div class="stats-line"><span>Giá thuê: <b>${fmt(cost)}</b></span><span>Cần cấp: <b>${lvl}</b></span><span>Tiền đang có: <b>${fmt(S.money)}</b></span></div>
+      <div class="btn-row"><button class="btn" data-act="rent" ${S.level < lvl || S.money < cost ? 'disabled' : ''}>Thuê mặt bằng</button></div>`;
+  }
   if (!G.open) {
     const [cost, lvl] = gianCost(si, i);
     return `<p class="event-text">${lotName(i)[0].toUpperCase() + lotName(i).slice(1)} ở Khu phố ${si + 1} đang <b>cho thuê</b>. Thuê rồi là có chỗ bày thêm một sạp. Lô mở lần lượt: hàng 1 trước, hàng 2 sau, thuê đủ 6 lô mới mở khu phố kế tiếp.</p>
       <div class="stats-line"><span>Giá thuê: <b>${cost ? fmt(cost) : 'Miễn phí'}</b></span><span>Cần cấp: <b>${lvl}</b></span><span>Tiền đang có: <b>${fmt(S.money)}</b></span></div>
       <div class="btn-row"><button class="btn" data-act="rent" ${S.level < lvl || S.money < cost ? 'disabled' : ''}>Thuê ${lotName(i)}</button></div>`;
   }
+  if (isShopLot(si, i)) return shopHTML(si, i);
   if (!G.placed) {
     return `<p class="event-text">${lotName(i)[0].toUpperCase() + lotName(i).slice(1)} đang trống. Bấm vào <b>xe máy</b> của bạn ở đầu phố, chọn một sạp rồi chọn lô này để bày. Người bán sẽ chạy ra rao hàng giùm bạn.</p>
       <div class="btn-row"><button class="btn" data-act="openbike">Mở sạp trên xe</button></div>`;
@@ -2454,10 +2797,10 @@ function street2HTML() {
 }
 function openGian(si, i) {
   const G = S.streets[si].gians[i];
-  if (G.open && !G.placed && R.placing != null && R.view === 'street') { placeUnit(R.placing, si, i); return; }
+  if (G.open && !G.placed && !isShopLot(si, i) && R.placing != null && R.view === 'street') { placeUnit(R.placing, si, i); return; }
   R.gianTab = 'hang';
   R.slotSel = G.open ? (G.slots.findIndex((sl, k) => k < slotsOpen(G) && !sl.qty) >= 0 ? G.slots.findIndex((sl, k) => k < slotsOpen(G) && !sl.qty) : null) : null;
-  openModal(`Gian số ${i + 1}${S.streets.length > 1 ? ' · Khu phố ' + (si + 1) : ''}`, gianHTML(si, i), { kind: 'gian', arg: [si, i] }); }
+  openModal(`${isShopLot(si, i) ? (G.biz ? SHOP_TYPES[G.biz].name : 'Mặt bằng') : 'Sạp'} · ${lotName(i)} · ${kpLabel(si)}`, gianHTML(si, i), { kind: 'gian', arg: [si, i] }); }
 const openMarket = () => openModal('Chợ đầu mối', marketHTML(), { kind: 'market' });
 const openKho = () => openModal('Kho hàng', khoHTML(), { kind: 'kho' });
 const openNeighbors = () => openModal('Hàng xóm', neighborsHTML(), { kind: 'neighbors' });
@@ -2479,6 +2822,7 @@ $('modal-body').addEventListener('click', (e) => {
   if (d.buy) return buy(d.buy, d.n);
   if (d.visit) return visitNeighbor(d.visit);
   if (d.thug) return resolveThug(d.thug);
+  if (d.biz) { openBiz(si, i, d.biz); refreshModal(); return; }
   if (d.slot !== undefined) { const k = Number(d.slot); R.slotSel = R.slotSel === k ? null : k; R.gianTab = 'hang'; Snd.click(); }
   else if (d.stock) stockSlot(si, i, R.slotSel, d.stock);
   else if (d.decor) buyDecor(si, i, d.decor);
@@ -2501,7 +2845,9 @@ $('modal-body').addEventListener('click', (e) => {
     case 'repay': repayDebt(); break;
     case 'kho': upgradeKho(); break;
     case 'autostock': autoStock(); break;
-    case 'rent': rentGian(si, i); if (!R.modal) return; break;
+    case 'rent': rentGian(si, i); if (isShopLot(si, i) && S.streets[si].gians[i].open) { openGian(si, i); return; } if (!R.modal) return; break;
+    case 'bizup': upgradeBiz(si, i); break;
+    case 'bizclose': closeBiz(si, i); break;
     case 'openbike': closeModal(); openBike(); return;
     case 'pickup': pickupUnit(si, i); closeModal(); return;
     case 'collect': collect(si, i); break;
@@ -2527,7 +2873,7 @@ function renderDock() {
   const cur = R.view === 'street' ? 'kp' + S.cur : R.view;
   const kps = Array.from({ length: KP_COUNT }, (_, k) => {
     const locked = !kpOpen(k);
-    return `<button class="kp${cur === 'kp' + k ? ' on' : ''}${locked ? ' locked' : ''}${isVip(k) ? ' vip' : ''}" data-go="kp${k}" title="${locked ? `${kpLabel(k)}: thuê đủ 6 lô ${kpLabel(k - 1)} để mở` : `${kpLabel(k)} · ${KP_NAMES[k]}${isVip(k) ? ' (phố VIP)' : ''}`}"><span class="kp-sign">${locked ? '<i class="kp-lock" aria-hidden="true"></i>' : ''}KP ${k + 1}</span><span class="kp-post"></span><span class="kp-pin"></span></button>`;
+    return `<button class="kp${cur === 'kp' + k ? ' on' : ''}${locked ? ' locked' : ''}${isVip(k) ? ' vip' : ''}" data-go="kp${k}" title="${locked ? `${kpLabel(k)}: thuê đủ 6 lô ${kpLabel(k - 1)} để mở` : `${kpLabel(k)} · ${KP_NAMES[k]}${isVip(k) ? ' (phố mặt tiền, thuê tiệm được)' : ''}`}"><span class="kp-sign">${locked ? '<i class="kp-lock" aria-hidden="true"></i>' : ''}KP ${k + 1}</span><span class="kp-post"></span><span class="kp-pin"></span></button>`;
   }).join('');
   const ic = (go, icon, label) => `<button class="nav-ic${cur === go ? ' on' : ''}" data-go="${go}"><span class="ni" aria-hidden="true">${icon}</span><span class="nl">${label}</span></button>`;
   $('dock').innerHTML = `${ic('home', '🏠', 'Nhà riêng')}<div class="kp-track"><span class="kp-road"></span>${kps}</div>${ic('market', '🛒', 'Chợ')}${ic('cafe', '☕', 'Cà phê')}${ic('fish', '🎣', 'Hồ câu')}${ic('kho', '🎒', 'Túi đồ')}`;
@@ -3176,6 +3522,7 @@ function render() {
     const nl = mine ? nextLot() : null;
     gians.forEach((G, i) => {
       const cx = lotX(i), base = lotBase(i);
+      if (R.view === 'street' && isShopLot(S.cur, i)) { drawShopFront(cx, G, i, S.cur, hits, nl); return; }
       // lô chưa thuê: chỉ lô kế tiếp mới có bảng cho thuê
       if (!G.open) {
         if (nl && nl.si === S.cur && nl.li === i) {
@@ -3223,6 +3570,7 @@ function render() {
       hits.push({ x: cx - 100, y: base - 172, w: 200, h: 176, kind: 'gian', i });
     });
     for (const p of portalsFor()) { const hb = drawPortal(p); hits.push(hb); }
+    if (R.view === 'street') { people(R.guests); drawActor(layer, hits); }
     // người bán đang chạy ra lô
     for (const r of R.runners) {
       if (r.si !== S.cur || R.view !== 'street') continue;
@@ -3264,6 +3612,7 @@ function render() {
   if (R.view !== 'fish' && R.view !== 'cafe' && R.view !== 'market') for (const b of [...R.bikes].sort((a, b2) => a.y - b2.y)) drawBike(ctx, b);
   if (R.police?.phase === 'drive') drawTruck(ctx, R.police.x, isStreetView() ? 664 : 680);
   if (R.view === 'street' && !R.attract) drawRoad(hits);
+  drawRain();
 
   // đêm xuống: phủ tối, đèn cửa sổ, đèn sạp
   const dk = darkness(h);
@@ -3289,9 +3638,9 @@ function render() {
 
   // bảng hàng + két tiền trên đầu mỗi gian
   gians.forEach((G, i) => {
-    if (!G.placed) return;
-    const cx = lotX(i), by = lotBase(i) - 206;
-    if (R.view === 'street') {
+    if (!G.placed && !G.biz) return;
+    const cx = lotX(i), by = G.biz ? ST_GROUND - 122 : lotBase(i) - 206;
+    if (R.view === 'street' && !G.biz) {
       const cap = G.cap || 1, gl = G.goods || [];
       ctx.save(); ctx.translate(0, by - 226);
       ctx.fillStyle = 'rgba(255,244,214,.95)'; rr(ctx, cx - 52, 226, 104, 32, 9); ctx.fill(); ctx.strokeStyle = '#231A14'; ctx.lineWidth = 2; ctx.stroke();
@@ -3306,7 +3655,7 @@ function render() {
       if (G.phep) { ctx.fillStyle = '#2E7D4F'; ctx.beginPath(); ctx.arc(cx + 52, 227, 10, 0, 7); ctx.fill(); ctx.fillStyle = '#fff'; ctx.font = '800 12px "Baloo 2", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('P', cx + 52, 228); }
       ctx.restore();
     }
-    const cry = R.view === 'street' && R.cries[S.cur + '-' + i];
+    const cry = R.view === 'street' && !G.biz && R.cries[S.cur + '-' + i];
     if (cry) bubble(cry.text, cx + 60, by - 46, { size: 15, bg: '#FFF4D6', maxW: 300 });
     if (G.cash >= 500) {
       const r = clamp(17 + Math.sqrt(G.cash) / 20, 17, 28);
@@ -3494,6 +3843,7 @@ canvas.addEventListener('pointerdown', (e) => {
   const k = spotKey();
   if (h && h.kind === 'bike' && k) { const sp = BIKE_SPOT[k]; walkTo(sp.x + 40, WALK_Y1 - 4, bikeMenu); return; }
   if (h && h.kind === 'busstop' && k) { walkTo(BUS_STOP[k].x + 20, WALK_Y1 - 4, () => talk('Trạm xe buýt 52', BUS_DRIVER, ['Tuyến 52 ghé Nhà riêng, Chợ đầu mối và Khu phố. Vé 6.000đ một lượt.'], { choices: travelChoices('bus') })); return; }
+  if (h && h.kind === 'actor') { catchActor(); return; }
   if (h && h.kind === 'spill') { const it = h.item; walkTo(it.x, walkBand().y1, () => pickSpill(it)); return; }
   if (h && h.kind === 'driver') { walkTo(R.spill.x + 120, walkBand().y1, () => R.spill && talk('Chú ba gác', { skin: '#C68B5E', hair: '#1E1A1A', long: false, hat: 2, helmet: '#F7B32B', shirt: '#3E7CB1', pants: '#2F3E46' }, ['Trời ơi vấp cái ổ gà, đổ hết bia rồi! Phụ chú nhặt với con ơi!'], { choices: [{ label: 'Phụ nhặt giùm', sub: '2 sức', fn: helpSpill }, { label: 'Thôi', fn: null }] })); return; }
   if (h && h.kind === 'parking') { walkTo(210, 600, () => talk('Bãi giữ xe', BUS_DRIVER, ['Ra về bằng gì đây?'], { choices: [{ label: 'Chạy xe máy', sub: fmt(FUEL_COST), fn: () => talk('Xe máy của bạn', playerLook(), ['Chạy đi đâu?'], { choices: travelChoices('bike') }) }, { label: 'Đón xe buýt', sub: fmt(BUS_FARE), fn: () => talk('Trạm xe buýt 52', BUS_DRIVER, ['Đi đâu nè?'], { choices: travelChoices('bus') }) }, { label: 'Thôi', fn: null }] })); return; }
@@ -3537,7 +3887,7 @@ canvas.addEventListener('pointerdown', (e) => {
 canvas.addEventListener('pointermove', (e) => {
   if (!R.started || R.modal) { R.hover = null; return; }
   const h = hitAt(toLogical(e));
-  R.hover = h && ['cash', 'trash', 'rat', 'chair', 'portal', 'lot', 'spill', 'driver', 'kho', 'door', 'mail', 'oldman', 'bike', 'busstop', 'parking', 'mstall', 'board', 'boss', 'fun'].includes(h.kind) ? h : null;
+  R.hover = h && ['cash', 'trash', 'rat', 'chair', 'portal', 'lot', 'spill', 'driver', 'actor', 'kho', 'door', 'mail', 'oldman', 'bike', 'busstop', 'parking', 'mstall', 'board', 'boss', 'fun'].includes(h.kind) ? h : null;
   canvas.style.cursor = h && h.kind !== 'floor' ? 'pointer' : 'default';
 });
 const MOVE_KEYS = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'a', 'd', 'w', 's']);

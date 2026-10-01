@@ -943,3 +943,10 @@ button.slot-cell:hover { filter: brightness(1.08); }
 .mock-grid .btn { font-size: 16px; padding: 10px 12px; white-space: normal; text-align: center; }
 .mock-grid .btn small { color: inherit; opacity: 0.7; font: 600 11px var(--font-body); }
 .mock-grid .btn.big { grid-column: 1 / -1; font-size: 22px; flex-direction: column; }
+
+/* tiệm mặt tiền */
+.shop-hero { height: 100%; min-height: 300px; border-radius: 20px; border: 4px solid var(--ink); background: linear-gradient(160deg, var(--c), #231a14); color: var(--paper); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 6px 0 var(--ink); }
+.shop-hero .shop-ic { font-size: 84px; line-height: 1; }
+.shop-hero b { font: 800 30px/1 var(--font-display); }
+.shop-hero small { color: var(--paper-2); font-size: 14px; }
+.shop-hero .shop-props { font-size: 34px; letter-spacing: 8px; }
