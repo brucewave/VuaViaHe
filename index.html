@@ -26,31 +26,21 @@
         <canvas id="game-canvas" width="1280" height="720"></canvas>
 
         <div id="hud">
-          <div class="hud-group">
-            <div class="pill money"><span class="lbl">Tiền</span><b id="money-val">0đ</b></div>
-            <div class="pill level">
-              <span class="lvl-badge" id="level-val">1</span>
-              <div class="lvl-info">
-                <span class="lvl-title" id="title-val">Người bán dạo</span>
-                <span class="bar"><i id="xp-bar"></i></span>
-              </div>
-            </div>
-            <div class="pill energy" id="energy-pill" title="Năng lượng hồi 1 điểm mỗi 45 giây">
-              <span class="lbl">Sức</span>
-              <span class="bar"><i id="energy-bar"></i></span>
-              <b id="energy-val">20</b>
-            </div>
-            <div class="pill karma" id="karma-pill" title="Uy tín tăng khi làm ăn đàng hoàng, giảm khi chơi xấu hàng xóm">
-              <span class="lbl" id="karma-lbl">Uy tín</span><b id="karma-val">0</b>
-            </div>
+          <div class="hud-left">
+            <button class="player-card" data-nav="char" aria-label="Nhân vật của bạn">
+              <span class="avatar"><canvas id="hud-face" width="112" height="112" aria-hidden="true"></canvas><span class="lv" id="level-val">Lv.1</span></span>
+              <span class="pc-info">
+                <span class="pc-row"><b id="name-val">Bạn</b><span class="karma" id="karma-pill" title="Uy tín tăng khi làm ăn đàng hoàng, giảm khi chơi xấu hàng xóm"><i class="ic-karma" aria-hidden="true"></i><b id="karma-val">0</b><span id="karma-lbl">Uy tín</span></span></span>
+                <span class="pc-title" id="title-val">Người bán dạo</span>
+                <span class="xpbar"><i id="xp-bar"></i><em id="xp-val">0/100</em></span>
+              </span>
+            </button>
+            <div class="res money" id="money-pill"><i class="ri" data-ic="coin" aria-hidden="true"></i><span class="rv"><b id="money-val">0đ</b><small id="debt-val">Không nợ</small></span></div>
+            <div class="res energy" id="energy-pill" title="Sức hồi 1 điểm mỗi 45 giây"><i class="ri" data-ic="bolt" aria-hidden="true"></i><span class="rv"><b id="energy-val">20/20</b><span class="rbar"><i id="energy-bar"></i></span><small id="energy-timer">Đầy sức</small></span></div>
           </div>
-          <div class="hud-group">
-            <div class="pill place" id="place-val">Khu phố 1</div>
-            <div class="pill clock" id="clock-pill"><b id="clock-val">06:00</b><span id="debt-val">Không nợ</span></div>
-            <div id="topicons"></div>
-            <button class="icon-btn" id="btn-sound" aria-label="Tắt tiếng" title="Bật/tắt tiếng">♪</button>
-          </div>
+          <div id="topicons"></div>
         </div>
+        <div id="place-banner"><i data-ic="pin" aria-hidden="true"></i><b id="place-val">Khu phố 1</b><span class="sep" aria-hidden="true"></span><span id="clock-pill"><i data-ic="clock" aria-hidden="true"></i><b id="clock-val">06:00</b></span></div>
 
         <div id="street-tabs" hidden></div>
         <div id="toasts" aria-live="polite"></div>
@@ -70,7 +60,7 @@
           <div class="countdown"><i id="fight-timer"></i></div>
         </div>
 
-        <div id="quest" class="pill quest" hidden aria-live="polite"></div>
+        <div id="quest" class="quest" hidden aria-live="polite"></div>
         <div id="dialog" hidden role="dialog" aria-live="polite">
           <canvas id="dlg-face" width="120" height="140" aria-hidden="true"></canvas>
           <div class="dlg-main">
