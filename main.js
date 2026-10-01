@@ -3197,6 +3197,7 @@ function makeLook() {
   return L;
 }
 function drawPerson(g, p) {
+  if (p.look.chibi) return drawChibi(g, p);
   const L = p.look, s = L.scale || 1;
   const swing = p.moving ? Math.sin(p.phase) : 0;
   g.save();
@@ -3260,12 +3261,142 @@ function drawHat(g, L) {
     g.fillStyle = '#8B5A2B'; g.fillRect(-12, -125, 24, 3);
   }
 }
+// Nhân vật chính kiểu chibi (theo ảnh mẫu): đầu to, búi tóc, nón lá quai đỏ, áo bà ba nâu, quần ống rộng, dép.
+// Quay mặt sang phải, chân ở y = 0, cao ~150 kể cả nón; vẫn ăn theo đồ mặc trong tủ (màu áo, quần, nón, giày, phụ kiện).
+const CHIBI = { ol: '#3B2A20', skin: '#F6D7BE', hair: '#3A2A22', shirt: '#7E5538', pants: '#2F2420', straw: '#DDBF8E', strap: '#9A2E24', eye: '#4A2E1E', shoes: '#2A211B' };
+function drawChibi(g, p) {
+  const L = p.look, s = L.scale || 1, C = CHIBI;
+  const skin = L.skin || C.skin, hair = L.hair || C.hair, shirt = L.shirt || C.shirt, pants = L.pants || C.pants, shoes = L.shoes || C.shoes;
+  const sw = p.moving ? Math.sin(p.phase) : 0;
+  const by = p.moving ? -Math.abs(Math.cos(p.phase)) * 2.5 : 0;   // nhún nhẹ khi đi
+  g.save();
+  g.translate(p.x, p.y);
+  if (!p.seated) { g.fillStyle = 'rgba(0,0,0,0.18)'; g.beginPath(); g.ellipse(0, 0, 22 * s, 5.5 * s, 0, 0, Math.PI * 2); g.fill(); }
+  g.scale(s * (p.dir < 0 ? -1 : 1), s);
+  g.lineJoin = 'round'; g.lineCap = 'round'; g.strokeStyle = C.ol; g.lineWidth = 1.6;
+  const fo = (fill) => { g.fillStyle = fill; g.fill(); g.stroke(); };
+  const foot = (x, y) => {
+    g.beginPath(); g.ellipse(x + 2, y - 2.5, 6.5, 3, 0, 0, Math.PI * 2); fo(skin);
+    g.beginPath(); g.roundRect(x - 5, y - 1, 16, 3, 1.5); fo(shoes);
+    g.strokeStyle = shoes; g.lineWidth = 2; g.beginPath(); g.moveTo(x + 1, y - 4.5); g.lineTo(x + 5, y - 1); g.stroke();
+    g.strokeStyle = C.ol; g.lineWidth = 1.6;
+  };
+  // chân: ống quần rộng túm ở cổ chân, xoay quanh hông
+  const leg = (dx, ang, back) => {
+    const col = back ? shade(pants, -14) : pants;
+    if (p.seated) {
+      g.save(); g.translate(dx, 0);
+      g.lineWidth = 17; g.strokeStyle = C.ol; g.beginPath(); g.moveTo(0, -32); g.lineTo(16, -30); g.lineTo(18, -9); g.stroke();
+      g.lineWidth = 14; g.strokeStyle = col; g.stroke();
+      g.lineWidth = 1.6; g.strokeStyle = C.ol;
+      foot(17, 0);
+      g.restore();
+      return;
+    }
+    g.save(); g.translate(dx, -34); g.rotate(ang);
+    const hem = L.short ? 16 : 29;
+    if (L.short) { g.beginPath(); g.roundRect(-4, 12, 8, 19, 4); fo(skin); }
+    g.beginPath(); g.moveTo(-10, -2); g.quadraticCurveTo(-16, hem * 0.6, -7, hem); g.lineTo(7, hem); g.quadraticCurveTo(16, hem * 0.6, 10, -2); g.closePath(); fo(col);
+    g.translate(0, 34); g.rotate(-ang); foot(-2, 0);
+    g.restore();
+  };
+  // tay: ống tay áo rộng + bàn tay, xoay quanh vai; trả về vị trí bàn tay
+  const arm = (ang, back) => {
+    g.save(); g.translate(1, -64 + by); g.rotate(ang);
+    const sl = L.style === 'tank' ? skin : back ? shade(shirt, -14) : shirt;
+    g.beginPath(); g.moveTo(-5, -3); g.lineTo(5, -3); g.lineTo(10, 19); g.quadraticCurveTo(1, 23, -8, 20); g.closePath(); fo(sl);
+    g.beginPath(); g.arc(1, 23.5, 4.3, 0, Math.PI * 2); fo(skin);
+    if (L.acc === 'bracelet' && !back) { g.strokeStyle = '#8C5B2A'; g.lineWidth = 2.5; g.beginPath(); g.moveTo(-3, 20); g.lineTo(5, 20); g.stroke(); g.strokeStyle = C.ol; g.lineWidth = 1.6; }
+    g.restore();
+    return { x: 1 - 23.5 * Math.sin(ang), y: -64 + by + 23.5 * Math.cos(ang) };
+  };
+  const armF = p.rod ? -1.15 : p.seated ? -0.5 : p.moving ? -sw * 0.55 : 0.06;
+  const armB = p.seated ? -0.3 : p.moving ? sw * 0.55 : -0.06;
+
+  // lớp sau: chân sau, tay sau, búi tóc
+  leg(-2, p.moving ? -sw * 0.38 : 0, true);
+  arm(armB, true);
+  g.beginPath(); g.arc(-20, -88 + by, 8.5, 0, Math.PI * 2); fo(hair);
+  // chân trước
+  leg(3, p.moving ? sw * 0.38 : 0, false);
+  // cổ + thân áo bà ba
+  g.beginPath(); g.roundRect(-3, -74 + by, 7, 8, 2); fo(skin);
+  const hemY = L.long_dress ? -14 : -28;
+  g.beginPath();
+  g.moveTo(-11, -68 + by); g.quadraticCurveTo(1, -73 + by, 12, -68 + by);
+  g.quadraticCurveTo(17, -50 + by, 20, hemY + by); g.lineTo(-18, hemY + by);
+  g.quadraticCurveTo(-16, -50 + by, -11, -68 + by); g.closePath(); fo(shirt);
+  g.strokeStyle = 'rgba(35,26,20,.45)'; g.lineWidth = 1.2;
+  g.beginPath(); g.moveTo(1, hemY + by); g.lineTo(1, hemY - 11 + by); g.stroke();              // xẻ tà
+  g.strokeStyle = C.ol; g.lineWidth = 1.6;
+  if (L.style === 'flower') { g.fillStyle = '#F7E1A0'; for (const [a, b] of [[-8, -60], [6, -56], [-3, -46], [10, -40], [-9, -36]]) { g.beginPath(); g.arc(a, b + by, 2.4, 0, 7); g.fill(); } }
+  else if (L.style === 'aodai') { g.fillStyle = 'rgba(255,224,138,.85)'; g.fillRect(9, -68 + by, 3, hemY + 68); }
+  else { g.fillStyle = C.ol; for (const yy of [-60, -49, -38]) { g.beginPath(); g.arc(13 + (yy + 60) * 0.12, yy + by, 1.6, 0, 7); g.fill(); } }  // nút áo
+  if (L.style === 'collar') { g.fillStyle = '#FFFFFF'; g.beginPath(); g.moveTo(2, -70 + by); g.lineTo(12, -68 + by); g.lineTo(9, -62 + by); g.closePath(); fo('#FFFFFF'); }
+  if (L.acc === 'scarf') { for (let k = 0; k < 4; k++) { g.fillStyle = k % 2 ? '#F2F2EE' : '#231A14'; g.fillRect(-8 + k * 5, -72 + by, 5, 6); } }
+  // tay trước
+  const hand = arm(armF, false);
+  if (p.rod) { g.strokeStyle = '#8C6A3A'; g.lineWidth = 3; g.beginPath(); g.moveTo(hand.x, hand.y); g.lineTo(hand.x + 120, hand.y - 150); g.stroke(); g.strokeStyle = C.ol; g.lineWidth = 1.6; }
+  if (L.acc === 'book') { g.beginPath(); g.rect(hand.x - 2, hand.y - 9, 10, 13); fo('#C0392B'); }
+
+  // đầu to
+  const hy = -95 + by;
+  g.beginPath(); g.arc(3, hy, 23, 0, Math.PI * 2); fo(skin);
+  // tóc: phủ sau đầu và đỉnh, mái lòa xòa phía trước
+  g.beginPath();
+  g.arc(2, hy, 24.5, Math.PI * 0.72, Math.PI * 1.86);
+  g.quadraticCurveTo(21, hy - 3, 14, hy - 4);
+  g.quadraticCurveTo(8, hy - 2, 4, hy + 5);
+  g.quadraticCurveTo(-4, hy + 11, -16, hy + 15);
+  g.closePath(); fo(hair);
+  g.strokeStyle = hair; g.lineWidth = 3; g.beginPath(); g.moveTo(5, hy + 2); g.quadraticCurveTo(8, hy + 12, 5, hy + 20); g.stroke();  // lọn tóc mai
+  g.strokeStyle = C.ol; g.lineWidth = 1.6;
+  g.beginPath(); g.ellipse(-2, hy + 7, 4, 5.5, 0, 0, Math.PI * 2); fo(skin);                     // tai
+  // mặt: mắt to có đốm sáng, má hồng, miệng cười
+  g.fillStyle = C.eye; g.beginPath(); g.ellipse(14, hy + 4, 3.4, 4.8, 0, 0, Math.PI * 2); g.fill();
+  g.fillStyle = '#FFFFFF'; g.beginPath(); g.arc(15.2, hy + 2, 1.4, 0, Math.PI * 2); g.fill();
+  g.strokeStyle = C.ol; g.lineWidth = 1.8; g.beginPath(); g.moveTo(10, hy - 1.5); g.quadraticCurveTo(14, hy - 3.5, 18.5, hy - 1); g.stroke();
+  g.fillStyle = 'rgba(236,128,118,.45)'; g.beginPath(); g.ellipse(11, hy + 12, 4.6, 2.6, 0, 0, Math.PI * 2); g.fill();
+  g.lineWidth = 1.5; g.beginPath(); g.moveTo(18.5, hy + 13); g.quadraticCurveTo(21, hy + 16, 23.5, hy + 12.5); g.stroke();
+  if (L.glasses || L.acc === 'glasses') { g.beginPath(); g.arc(14, hy + 4, 6, 0, Math.PI * 2); g.stroke(); g.beginPath(); g.moveTo(8, hy + 3); g.lineTo(-1, hy + 2); g.stroke(); }
+  g.lineWidth = 1.6;
+  drawChibiHat(g, L, hy);
+  g.restore();
+}
+function drawChibiHat(g, L, hy) {
+  const C = CHIBI, fo = (fill) => { g.fillStyle = fill; g.fill(); g.stroke(); };
+  if (L.hat === 1) {
+    // quai nón đỏ thắt nơ dưới cằm
+    g.strokeStyle = C.strap; g.lineWidth = 2.2;
+    g.beginPath(); g.moveTo(-1, hy - 14); g.quadraticCurveTo(0, hy + 13, 13, hy + 21); g.stroke();
+    g.fillStyle = C.strap; g.beginPath(); g.moveTo(13, hy + 21); g.lineTo(8, hy + 17); g.lineTo(8, hy + 25); g.closePath(); g.moveTo(13, hy + 21); g.lineTo(18, hy + 17); g.lineTo(18, hy + 25); g.closePath(); g.fill();
+    g.lineWidth = 1.6; g.beginPath(); g.moveTo(13, hy + 21); g.lineTo(11, hy + 30); g.moveTo(13, hy + 21); g.lineTo(15, hy + 30); g.stroke();
+    g.strokeStyle = C.ol;
+    g.save(); g.translate(2, hy - 15); g.rotate(-0.1);
+    g.beginPath(); g.ellipse(0, 0, 38, 6.5, 0, 0, Math.PI * 2); fo(shade(C.straw, -34));            // lòng nón
+    g.beginPath(); g.moveTo(-38, 0); g.lineTo(-3, -40); g.lineTo(38, 0); g.ellipse(0, 0, 38, 2.8, 0, 0, Math.PI); g.closePath(); fo(C.straw);
+    g.strokeStyle = 'rgba(120,90,40,.5)'; g.lineWidth = 1;
+    g.beginPath(); for (let i = 1; i < 7; i++) { g.moveTo(-3, -40); g.lineTo(-38 + i * 76 / 7, 2.4); } g.stroke();
+    g.beginPath(); g.moveTo(-24, -14); g.lineTo(23, -14); g.moveTo(-13, -26); g.lineTo(12, -26); g.stroke();
+    g.restore();
+  } else if (L.hat === 2) {
+    g.beginPath(); g.arc(3, hy - 4, 26, Math.PI, 0); g.lineTo(29, hy + 2); g.lineTo(-23, hy + 2); g.closePath(); fo(L.helmet || '#D98E04');
+    g.beginPath(); g.roundRect(14, hy - 3, 18, 5, 2); fo('#3A3A40');
+  } else if (L.hat === 3) {
+    g.beginPath(); g.arc(3, hy - 6, 24.5, Math.PI, 0); g.closePath(); fo(L.capColor || '#C0392B');
+    g.beginPath(); g.ellipse(32, hy - 6, 13, 3.5, 0, 0, Math.PI * 2); fo(L.capColor || '#C0392B');
+  } else if (L.hat === 4) {
+    g.beginPath(); g.ellipse(3, hy - 12, 34, 6, 0, 0, Math.PI * 2); fo('#EFE2BF');
+    g.beginPath(); g.arc(3, hy - 13, 21, Math.PI, 0); g.closePath(); fo('#EFE2BF');
+    g.fillStyle = '#8B5A2B'; g.fillRect(-18, hy - 17, 42, 4);
+  }
+}
 function playerLook() {
   const o = S.outfit, F = (slot) => (o[slot] ? FASHION[o[slot]] : null);
   const shirt = F('shirt'), pants = F('pants');
-  return { skin: '#E0AC80', hair: '#1E1A1A', long: true, scale: 1.05, capColor: '#C0392B', helmet: '#D98E04',
-    hat: F('hat')?.hat || 0, shirt: shirt?.color || '#8E6FB5', style: shirt?.style, long_dress: shirt?.style === 'aodai',
-    pants: pants?.color || '#231A14', short: !!pants?.short, shoes: F('shoes')?.shoes, acc: F('acc')?.acc };
+  return { chibi: true, skin: CHIBI.skin, hair: CHIBI.hair, long: true, scale: 1.05, capColor: '#C0392B', helmet: '#D98E04',
+    hat: F('hat')?.hat || 1, shirt: shirt?.color || CHIBI.shirt, style: shirt?.style, long_dress: shirt?.style === 'aodai',
+    pants: pants?.color || CHIBI.pants, short: !!pants?.short, shoes: F('shoes')?.shoes, acc: F('acc')?.acc };
 }
 function nameTag(g, name, x, y, mine, sub) {
   g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineJoin = 'round';
