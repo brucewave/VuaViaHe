@@ -7,7 +7,7 @@ let W = 1280;            // bề rộng khung hình, co giãn theo màn hình
 const H = 720, SW = 1280; // SW: bề rộng các cảnh cố định (nhà, chợ, cà phê, hồ câu)
 const GROUND = 420;          // chân tường dãy nhà
 const CURB = 636;            // mép vỉa hè
-const WALK_Y0 = 452, WALK_Y1 = 608;   // cả vỉa hè, từ chân tường nhà tới sát mép thanh dưới
+const WALK_Y0 = 452, WALK_Y1 = 626;   // cả vỉa hè, từ chân tường nhà tới mép đường
 const FRONT_Y = 540;                  // chỗ đứng ngay trước quầy sạp
 // đứng xa (sát nhà) thì nhỏ hơn, đứng gần mép đường thì to hơn
 const depthScale = (y) => { const b = walkBand(); return 0.88 + 0.22 * clamp((y - b.y0) / (b.y1 - b.y0), 0, 1); };
@@ -1190,9 +1190,9 @@ const camTarget = () => -sceneMargin();
 const personBase = () => (isStreetView() ? 0.86 : 1);   // khu phố nhìn xa hơn nên người nhỏ lại
 function walkBand() {
   if (R.view === 'fish') return { x0: 560, x1: 640, y0: 538, y1: 542 };
-  if (R.view === 'cafe') return { x0: 40, x1: SW - 40, y0: 578, y1: 608 };
+  if (R.view === 'cafe') return { x0: 40, x1: SW - 40, y0: 578, y1: 626 };
   if (R.view === 'home') return { x0: 60, x1: SW - 60, y0: WALK_Y0, y1: WALK_Y1 };
-  if (R.view === 'market') return { x0: 60, x1: SW - 60, y0: 512, y1: 608 };
+  if (R.view === 'market') return { x0: 60, x1: SW - 60, y0: 512, y1: 626 };
   return { x0: 40, x1: SW - 40, y0: ST_WALK.y0, y1: ST_WALK.y1 };
 }
 function walkTo(x, y, then) {
@@ -2625,7 +2625,7 @@ function onMockAct(act) {
 
 // ---------- Đi lại: xe máy, đi bộ ----------
 const FUEL_COST = 3000;
-const BIKE_SPOT = { home: { x: 640, y: 606 }, street: { x: 110, y: 604 } };   // trên mép thanh dưới để không bị che
+const BIKE_SPOT = { home: { x: 640, y: 654 }, street: { x: 110, y: 640 } };
 const DEST_NAME = { home: 'Nhà riêng', market: 'Chợ đầu mối', cafe: 'Quán cà phê', fish: 'Hồ câu' };
 const destName = (d) => (d.startsWith('kp') ? kpLabel(Number(d.slice(2))) : DEST_NAME[d]);
 const curDest = () => (R.view === 'street' ? 'kp' + S.cur : R.view);
@@ -2797,11 +2797,7 @@ function renderQuest() {
   if (!el) return;
   const t = R.started && S.quest && S.quest !== 'done' ? QUEST_TEXT[S.quest] : '';
   el.hidden = !t;
-  if (t && el.dataset.q !== S.quest) {
-    const steps = Object.keys(QUEST_TEXT), k = steps.indexOf(S.quest) + 1;
-    el.dataset.q = S.quest;
-    el.innerHTML = `<span class="q-ic" aria-hidden="true">!</span><span class="q-body"><span class="q-head"><b>Nhiệm vụ chính</b><small>Bước ${k}/${steps.length}</small></span><span class="q-text">${t}</span></span>`;
-  }
+  if (t && el.dataset.q !== S.quest) { el.dataset.q = S.quest; el.innerHTML = `<span class="lbl">Nhiệm vụ</span><span>${t}</span>`; }
 }
 const PARK_GUARD = { skin: '#C68B5E', hair: '#1E1A1A', long: false, hat: 3, capColor: '#2E8B57', shirt: '#2E8B57', style: 'collar', pants: '#2F3E46' };
 
@@ -3145,7 +3141,7 @@ function closeModal() {
 }
 const MODAL_HTML = { market: () => marketHTML(R.modalArg), debt: () => debtHTML(), fun: () => funHTML(), kho: () => khoHTML(), gian: () => gianHTML(...R.modalArg), neighbors: () => neighborsHTML(),
   fashion: () => fashionHTML(), news: () => newsHTML(), cafe: () => cafeHTML(), street2: () => street2HTML(),
-  fishshop: () => fishShopHTML(), veso: () => vesoHTML(), pickchar: () => pickCharHTML(), ach: () => achHTML(), reviews: () => reviewsHTML(), paper: () => paperHTML(), lot: () => lotHTML(...R.modalArg), mock: () => mockHTML(), settings: () => settingsHTML(), basket: () => basketHTML(), book: () => bookHTML(), profile: () => profileHTML(R.modalArg), char: () => charHTML() };
+  fishshop: () => fishShopHTML(), veso: () => vesoHTML(), pickchar: () => pickCharHTML(), ach: () => achHTML(), reviews: () => reviewsHTML(), paper: () => paperHTML(), lot: () => lotHTML(...R.modalArg), mock: () => mockHTML(), basket: () => basketHTML(), book: () => bookHTML(), profile: () => profileHTML(R.modalArg), char: () => charHTML() };
 function refreshModal() {
   if (!R.modal || !MODAL_HTML[R.modal]) return;
   const b = $('modal-body');
@@ -3431,99 +3427,37 @@ $('modal-body').addEventListener('click', (e) => {
     case 'repair': repairGian(si, i); break;
     case 'upstall': upgradeStall(si, i); break;
     case 'street2': return buyStreet2();
-    case 'sound': setSound(!Snd.on); break;
-    case 'opench': closeModal(); openChar(); return;
-    case 'openmock': closeModal(); openMock(); return;
   }
   refreshModal();
 });
 $('modal-close').addEventListener('click', closeModal);
 $('modal').addEventListener('pointerdown', (e) => { if (e.target.id === 'modal' && !$('modal-close').hidden) closeModal(); });
 
-// ---------- Biểu tượng SVG cho HUD (vẽ tay, viền xanh đậm, kiểu game mobile) ----------
-const IC_O = '#16345F';
-const svgIc = (body) => `<svg viewBox="0 0 48 48" aria-hidden="true" focusable="false"><g stroke="${IC_O}" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round">${body}</g></svg>`;
-const ICONS = {
-  coin: svgIc('<circle cx="24" cy="24" r="19" fill="#F7B92B"/><circle cx="24" cy="24" r="13" fill="#FFD84D" stroke="#D18A10"/><text x="24" y="32" text-anchor="middle" font-family="Baloo 2, sans-serif" font-weight="800" font-size="24" fill="#B26A00" stroke="none">đ</text>'),
-  bolt: svgIc('<path d="M28 3 9 27h12l-4 18 22-26H27l4-16z" fill="#FFCC33"/><path d="M26 9 16 23" stroke="#FFF3B0" stroke-width="2" fill="none"/>'),
-  star: svgIc('<path d="m24 4 6 12.5 13.6 1.9-9.9 9.6 2.4 13.6L24 35.1l-12.1 6.5 2.4-13.6-9.9-9.6L18 16.5z" fill="#FFD23F"/>'),
-  mask: svgIc('<path d="M5 16c6-3 13-3 19 0 6-3 13-3 19 0 0 12-6 20-13 20-3 0-4-3-6-3s-3 3-6 3C11 36 5 28 5 16z" fill="#9B5DE5"/><ellipse cx="16" cy="22" rx="4" ry="3" fill="#16345F"/><ellipse cx="32" cy="22" rx="4" ry="3" fill="#16345F"/>'),
-  paper: svgIc('<path d="M38 15h4v21a4 4 0 0 1-4 4" fill="#DCE6F2"/><rect x="6" y="8" width="32" height="32" rx="4" fill="#FFFFFF"/><rect x="11" y="13" width="12" height="10" rx="2" fill="#4EA8F5"/><path d="M27 14h7M27 19h7M11 28h23M11 33h18" fill="none" stroke="#9AA9BD"/>'),
-  bell: svgIc('<path d="M19 37a5 5 0 0 0 10 0" fill="#F29E1F"/><path d="M24 6c-8 0-12 6-12 13v8l-4 6h32l-4-6v-8c0-7-4-13-12-13z" fill="#FFC93C"/><path d="M17 18c1-3 3-5 6-6" fill="none" stroke="#FFF1B0"/>'),
-  chat: svgIc('<path d="M8 9h32a4 4 0 0 1 4 4v17a4 4 0 0 1-4 4H22l-9 7v-7H8a4 4 0 0 1-4-4V13a4 4 0 0 1 4-4z" fill="#7FD1FF"/><circle cx="15" cy="22" r="2.6" fill="#16345F" stroke="none"/><circle cx="24" cy="22" r="2.6" fill="#16345F" stroke="none"/><circle cx="33" cy="22" r="2.6" fill="#16345F" stroke="none"/>'),
-  trophy: svgIc('<path d="M14 9H7c0 7 3 10 8 10M34 9h7c0 7-3 10-8 10" fill="none"/><path d="M14 6h20v10a10 10 0 0 1-20 0z" fill="#FFC93C"/><path d="M21 26h6v7h-6z" fill="#F29E1F"/><rect x="13" y="33" width="22" height="8" rx="2" fill="#B5651D"/><path d="M19 10v6" stroke="#FFF1B0" fill="none"/>'),
-  people: svgIc('<path d="M27 40c1-7 3-12 6-12 6 0 11 5 11 12z" fill="#F5739B"/><circle cx="32" cy="17" r="6" fill="#F7B48A"/><path d="M4 40c0-8 6-13 13-13s13 5 13 13z" fill="#4EA8F5"/><circle cx="17" cy="16" r="7" fill="#FFC79A"/>'),
-  gear: svgIc('<path d="M21 4h6l1 5 4 2 4-3 4 4-3 4 2 4 5 1v6l-5 1-2 4 3 4-4 4-4-3-4 2-1 5h-6l-1-5-4-2-4 3-4-4 3-4-2-4-5-1v-6l5-1 2-4-3-4 4-4 4 3 4-2z" fill="#B9C6D8"/><circle cx="24" cy="24" r="7" fill="#EEF3FA"/>'),
-  flask: svgIc('<path d="M18 5h12M20 5v13L8 38a3 3 0 0 0 3 5h26a3 3 0 0 0 3-5L28 18V5" fill="#EAF6FF"/><path d="M13 31h22l4 7a3 3 0 0 1-3 4H12a3 3 0 0 1-3-4z" fill="#6CD36C"/>'),
-  home: svgIc('<path d="M10 21v20h28V21L24 9z" fill="#FFE2A0"/><path d="M3 24 24 6l21 18-4 2L24 12 7 26z" fill="#E8553E"/><rect x="20" y="28" width="9" height="13" rx="1" fill="#A0602F"/><rect x="31" y="26" width="5" height="5" fill="#7FD1FF" stroke-width="2"/>'),
-  cart: svgIc('<path d="M3 8h6l5 22h24l4-15H12" fill="none"/><path d="M12 15h30l-4 15H14z" fill="#4EC0F0"/><path d="M20 15v15M28 15v15" fill="none" stroke="#2C8FC0" stroke-width="2"/><circle cx="17" cy="38" r="3.5" fill="#FFFFFF"/><circle cx="34" cy="38" r="3.5" fill="#FFFFFF"/>'),
-  coffee: svgIc('<path d="M34 20h3a5 5 0 0 1 0 10h-4" fill="none"/><path d="M8 17h26v12a10 10 0 0 1-10 10h-6A10 10 0 0 1 8 29z" fill="#FFFFFF"/><path d="M11 21h20v5H11z" fill="#8B5A2B" stroke="none"/><path d="M15 4c-2 3 2 5 0 8M23 4c-2 3 2 5 0 8" fill="none" stroke="#9AA9BD"/><path d="M5 43h32" fill="none"/>'),
-  fish: svgIc('<path d="M36 24l8-8v16z" fill="#2E86C1"/><path d="M6 24c6-10 20-12 30 0-10 12-24 10-30 0z" fill="#5BC0EB"/><circle cx="15" cy="22" r="2.4" fill="#16345F" stroke="none"/><path d="M22 18c2 4 2 8 0 12" fill="none" stroke="#B9E6FA" stroke-width="2"/>'),
-  bag: svgIc('<path d="M17 12a7 7 0 0 1 14 0" fill="none"/><rect x="8" y="12" width="32" height="30" rx="7" fill="#F08A3C"/><rect x="14" y="26" width="20" height="10" rx="3" fill="#FFB36B"/><path d="M14 18h20" fill="none" stroke="#C4621C"/>'),
-  lock: svgIc('<path d="M15 21v-6a9 9 0 0 1 18 0v6" fill="none"/><rect x="10" y="21" width="28" height="21" rx="5" fill="#B9C6D8"/><circle cx="24" cy="30" r="3" fill="#16345F" stroke="none"/><path d="M24 31v5" stroke-width="3"/>'),
-  kp: svgIc('<path d="M25 41V16h16v25z" fill="#9FD8FF"/><path d="M29 21h3M35 21h3M29 27h3M35 27h3M29 33h3M35 33h3" stroke-width="2.2"/><path d="M7 41V20l9-8 9 8v21z" fill="#FFE2A0"/><path d="M4 21 16 10l12 11" fill="none" stroke="#E8553E" stroke-width="4"/><rect x="13" y="30" width="6" height="11" fill="#A0602F"/>'),
-  shop: svgIc('<rect x="8" y="20" width="32" height="21" fill="#FFFFFF"/><path d="M5 12h38l-2 10H7z" fill="#F15A4A"/><path d="M14 13l-1 8M24 13v8M34 13l1 8" stroke="#FFFFFF" stroke-width="3"/><rect x="13" y="27" width="10" height="14" fill="#7FD1FF"/><rect x="27" y="27" width="9" height="7" fill="#FFD84D"/>'),
-  pin: svgIc('<path d="M24 44S9 29 9 19a15 15 0 0 1 30 0c0 10-15 25-15 25z" fill="#F15A4A"/><circle cx="24" cy="19" r="6" fill="#FFFFFF"/>'),
-  clock: svgIc('<circle cx="24" cy="24" r="19" fill="#FFFFFF"/><path d="M24 12v12l8 5" fill="none" stroke-width="3.2"/>'),
-  sound: svgIc('<path d="M6 18h8l11-9v30l-11-9H6z" fill="#FFD23F"/><path d="M31 17a9 9 0 0 1 0 14M36 12a16 16 0 0 1 0 24" fill="none"/>'),
-};
-// điền icon vào các chỗ đặt sẵn data-ic trong HTML tĩnh
-function paintIcons(root = document) { root.querySelectorAll('[data-ic]').forEach((el) => { if (!el.dataset.done) { el.innerHTML = ICONS[el.dataset.ic] || ''; el.dataset.done = 1; } }); }
-
 // ---------- Thanh điều hướng (dưới), nút chức năng (trên), nút theo cảnh (nổi) ----------
-// Thanh dưới chỉ để đi lại, giống nhau ở mọi cảnh: nhà riêng, chuỗi khu phố, rồi các nơi khác.
+// Thanh dưới chỉ để đi lại, giống nhau ở mọi cảnh.
 function renderDock() {
   const cur = R.view === 'street' ? 'kp' + S.cur : R.view;
   const kps = Array.from({ length: KP_COUNT }, (_, k) => {
     const locked = !kpOpen(k);
-    const title = locked ? `${kpLabel(k)}: thuê đủ 6 lô ${kpLabel(k - 1)} để mở` : `${kpLabel(k)} · ${KP_NAMES[k]}${isVip(k) ? ' (phố mặt tiền, thuê tiệm được)' : ''}`;
-    return `<button class="kp${cur === 'kp' + k ? ' on' : ''}${locked ? ' locked' : ''}${isVip(k) ? ' vip' : ''}" data-go="kp${k}" title="${title}" aria-label="${title}"><span class="kp-ic">${locked ? ICONS.lock : isVip(k) ? ICONS.shop : ICONS.kp}</span><span class="kp-n">KP ${k + 1}</span></button>`;
+    return `<button class="kp${cur === 'kp' + k ? ' on' : ''}${locked ? ' locked' : ''}${isVip(k) ? ' vip' : ''}" data-go="kp${k}" title="${locked ? `${kpLabel(k)}: thuê đủ 6 lô ${kpLabel(k - 1)} để mở` : `${kpLabel(k)} · ${KP_NAMES[k]}${isVip(k) ? ' (phố mặt tiền, thuê tiệm được)' : ''}`}"><span class="kp-sign">${locked ? '<i class="kp-lock" aria-hidden="true"></i>' : ''}KP ${k + 1}</span><span class="kp-post"></span><span class="kp-pin"></span></button>`;
   }).join('');
-  const tile = (go, icon, label, cls = '') => `<button class="tile${cls}${cur === go ? ' on' : ''}" data-go="${go}"><span class="ti">${ICONS[icon]}</span><span class="tl">${label}</span></button>`;
-  $('dock').innerHTML = `${tile('home', 'home', 'Nhà riêng', ' home')}<div class="kp-chain">${kps}</div><div class="dock-right">${tile('market', 'cart', 'Chợ')}${tile('cafe', 'coffee', 'Cà phê')}${tile('fish', 'fish', 'Hồ câu')}${tile('kho', 'bag', 'Túi đồ')}</div>`;
+  const ic = (go, icon, label) => `<button class="nav-ic${cur === go ? ' on' : ''}" data-go="${go}"><span class="ni" aria-hidden="true">${icon}</span><span class="nl">${label}</span></button>`;
+  $('dock').innerHTML = `${ic('home', '🏠', 'Nhà riêng')}<div class="kp-track"><span class="kp-road"></span>${kps}</div>${ic('market', '🛒', 'Chợ')}${ic('cafe', '☕', 'Cà phê')}${ic('fish', '🎣', 'Hồ câu')}${ic('kho', '🎒', 'Túi đồ')}`;
   renderTop();
   renderCtx();
 }
-// nút chức năng góc trên: báo, tin, góp ý, thành tựu, hàng xóm, cài đặt
+// nút chức năng góc trên: báo, tin, góp ý, thành tựu, hàng xóm, nhân vật, thử nghiệm
 function renderTop() {
   const badge = (n) => (n ? `<span class="badge">${n > 9 ? '9+' : n}</span>` : '');
-  const top = (nav, icon, label, title, n) => `<button class="top-ic" data-nav="${nav}" title="${title}" aria-label="${label}"><span class="tii">${ICONS[icon]}</span>${badge(n)}<em>${label}</em></button>`;
-  $('topicons').innerHTML = top('paper', 'paper', 'Báo', 'Báo Vỉa Hè: tin nóng mỗi ngày (P)', S.paperSeen !== gameDay() ? 1 : 0)
-    + top('news', 'bell', 'Tin', 'Tin khu phố (N)', R.unread)
-    + top('reviews', 'chat', 'Góp ý', 'Góp ý của khách (G)', unanswered())
-    + top('ach', 'trophy', 'Thành tựu', 'Thành tựu (J)', R.achNew || 0)
-    + top('neighbors', 'people', 'Hàng xóm', 'Hàng xóm (X)', 0)
-    + top('settings', 'gear', 'Cài đặt', 'Cài đặt, âm thanh, bảng thử nghiệm', 0);
+  const top = (nav, icon, label, title, n, cls = '') => `<button class="top-ic${cls}" data-nav="${nav}" title="${title}" aria-label="${label}"><span aria-hidden="true">${icon}</span>${badge(n)}<em>${label}</em></button>`;
+  $('topicons').innerHTML = top('paper', '🗞️', 'Báo', 'Báo Vỉa Hè: tin nóng mỗi ngày (P)', S.paperSeen !== gameDay() ? 1 : 0)
+    + top('news', '🔔', 'Tin', 'Tin khu phố (N)', R.unread)
+    + top('reviews', '💬', 'Góp ý', 'Góp ý của khách (G)', unanswered())
+    + top('ach', '🏆', 'Thành tựu', 'Thành tựu (J)', R.achNew || 0)
+    + top('neighbors', '👥', 'Hàng xóm', 'Hàng xóm (X)', 0)
+    + top('char', '👕', 'Nhân vật', 'Nhân vật (T)', 0)
+    + top('mock', '🧪', 'Thử', 'Bảng thử nghiệm: nạp dữ liệu thử, gọi sự kiện', 0, ' test');
 }
-function settingsHTML() {
-  return `<div class="set-list">
-    <button class="set-row" data-act="sound"><span class="set-ic">${ICONS.sound}</span><span class="set-tx"><b>Âm thanh</b><small>${Snd.on ? 'Đang bật' : 'Đang tắt'}</small></span><span class="switch${Snd.on ? ' on' : ''}" aria-hidden="true"><i></i></span></button>
-    <button class="set-row" data-act="opench"><span class="set-ic">${ICONS.people}</span><span class="set-tx"><b>Nhân vật</b><small>Đổi đồ, đổi tên, xem chỉ số</small></span></button>
-    <button class="set-row" data-act="openmock"><span class="set-ic">${ICONS.flask}</span><span class="set-tx"><b>Bảng thử nghiệm</b><small>Nạp dữ liệu thử, gọi sự kiện (dành cho bản test)</small></span></button>
-  </div>`;
-}
-function setSound(on) {
-  Snd.on = on; Snd.init();
-  try { localStorage.setItem('vuaviahe_sound', on ? '1' : '0'); } catch { /* bỏ qua */ }
-}
-// ảnh đại diện trên HUD: phóng to phần đầu nhân vật, chỉ vẽ lại khi đổi đồ
-function drawHudFace() {
-  const cv = $('hud-face');
-  if (!cv) return;
-  const look = playerLook(), key = JSON.stringify(look);
-  if (R.faceKey === key) return;
-  R.faceKey = key;
-  const g = cv.getContext('2d');
-  g.setTransform(1, 0, 0, 1, 0, 0);
-  g.clearRect(0, 0, cv.width, cv.height);
-  const grd = g.createLinearGradient(0, 0, 0, cv.height);
-  grd.addColorStop(0, '#BFE6FF'); grd.addColorStop(1, '#6FB7F2');
-  g.fillStyle = grd; g.fillRect(0, 0, cv.width, cv.height);
-  g.save(); g.translate(cv.width / 2, cv.height * 2.5); g.scale(2.3, 2.3);
-  drawPerson(g, { x: 0, y: 0, dir: 1, look: { ...look, scale: 1 }, moving: false, phase: 0 });
-  g.restore();
-}
-
 // Nút riêng của từng cảnh, nổi phía trên thanh dưới
 function renderCtx() {
   const C = $('ctx');
@@ -3580,7 +3514,6 @@ function onUiClick(e) {
   else if (nav === 'reviews') openReviews();
   else if (nav === 'ach') openAch();
   else if (nav === 'mock') openMock();
-  else if (nav === 'settings') openModal('Cài đặt', settingsHTML(), { kind: 'settings' });
   else if (nav === 'autoplace') autoPlaceAll();
   else if (nav === 'fun') openFun();
   else if (nav === 'veso') openVeso('buy');
@@ -3589,8 +3522,7 @@ function onUiClick(e) {
   else if (nav === 'book') openModal('Sổ câu', bookHTML(), { kind: 'book' });
   else if (nav === 'fishshop') openModal('Tiệm đồ câu', fishShopHTML(), { kind: 'fishshop' });
 }
-['dock', 'ctx', 'hud'].forEach((id) => $(id).addEventListener('click', onUiClick));
-paintIcons();
+['dock', 'ctx', 'topicons'].forEach((id) => $(id).addEventListener('click', onUiClick));
 $('modal-body').addEventListener('input', (e) => {
   if (e.target.id === 'char-name') { S.player.name = e.target.value.trim().slice(0, 16) || 'Bạn'; }
   if (e.target.id === 'pc-name') R.pickName = e.target.value;
@@ -3601,29 +3533,20 @@ function updateHUD() {
   const cb = document.querySelector('.coin-btn b');
   if (cb) cb.textContent = fmtK(S.streets[S.cur].gians.reduce((a, g) => a + g.cash, 0));
   $('money-val').textContent = fmt(S.money);
-  $('level-val').textContent = 'Lv.' + S.level;
-  $('name-val').textContent = S.player.name;
+  $('level-val').textContent = S.level;
   $('title-val').textContent = titleOf(S.level);
-  const maxed = S.level >= MAX_LVL;
-  $('xp-bar').style.width = (maxed ? 100 : clamp(S.xp / xpNeed(S.level), 0, 1) * 100) + '%';
-  $('xp-val').textContent = maxed ? 'Cấp tối đa' : `${S.xp}/${xpNeed(S.level)}`;
+  $('xp-bar').style.width = (S.level >= MAX_LVL ? 100 : clamp(S.xp / xpNeed(S.level), 0, 1) * 100) + '%';
   $('energy-bar').style.width = (S.energy / energyMax() * 100) + '%';
   $('energy-val').textContent = `${S.energy}/${energyMax()}`;
   $('energy-pill').classList.toggle('low', S.energy < 3);
-  if (S.energy >= energyMax()) $('energy-timer').textContent = 'Đầy sức';
-  else { const left = Math.max(0, Math.ceil((45000 - (now() - S.energyAt)) / 1000)); $('energy-timer').textContent = `+1 sau 0:${String(left).padStart(2, '0')}`; }
   const sly = S.karma < 0;
   $('karma-pill').classList.toggle('sly', sly);
   $('karma-lbl').textContent = sly ? 'Gian xảo' : 'Uy tín';
-  const ki = $('karma-pill').querySelector('.ic-karma'), kk = sly ? 'mask' : 'star';
-  if (ki.dataset.k !== kk) { ki.dataset.k = kk; ki.innerHTML = ICONS[kk]; }
-  drawHudFace();
   $('karma-val').textContent = Math.round(Math.abs(S.karma));
   $('debt-val').textContent = S.debt ? 'Nợ ' + fmtK(S.debt) : 'Không nợ';
   $('debt-val').classList.toggle('owe', S.debt > 0);
   $('place-val').textContent = R.view === 'neighbor' ? 'Nhà ' + nbBase(R.visit).name : R.view === 'cafe' ? `Quán cà phê · ${Net.roomPlayers().length + 1} người` : R.view === 'fish' ? 'Hồ câu' : R.view === 'home' ? 'Nhà riêng' : R.view === 'market' ? `Chợ đầu mối${areaPeak('market') ? ' · chợ sớm' : ''}` : `Khu phố ${S.cur + 1}${kpPeak(S.cur) ? ' · giờ đông khách' : kpSlow(S.cur) ? ' · giờ vắng' : ''}`;
   $('clock-pill').title = `Ngày ${gameDay()} trong game. Một ngày trong game dài 24 phút.`;
-  $('debt-val').hidden = !S.debt;
   $('clock-val').textContent = `N${gameDay()} · ${gclock()}`;
 }
 
@@ -4764,6 +4687,12 @@ window.addEventListener('keydown', (e) => {
 });
 $('btn-flee').addEventListener('click', flee);
 $('btn-fight').addEventListener('pointerdown', (e) => { e.preventDefault(); fightHit(); });
+$('btn-sound').addEventListener('click', () => {
+  Snd.on = !Snd.on; Snd.init();
+  $('btn-sound').classList.toggle('off', !Snd.on);
+  $('btn-sound').setAttribute('aria-label', Snd.on ? 'Tắt tiếng' : 'Bật tiếng');
+  try { localStorage.setItem('vuaviahe_sound', Snd.on ? '1' : '0'); } catch { /* bỏ qua */ }
+});
 $('btn-rotate-skip').addEventListener('click', () => { document.body.classList.add('skip-rotate'); fit(); });
 document.addEventListener('visibilitychange', () => { if (document.hidden && R.started) save(); });
 
@@ -4818,7 +4747,7 @@ $('btn-continue').addEventListener('click', () => {
 
 let softT = 0;
 function start(data) {
-  try { if (localStorage.getItem('vuaviahe_sound') === '0') { Snd.on = false; } } catch { /* bỏ qua */ }
+  try { if (localStorage.getItem('vuaviahe_sound') === '0') { Snd.on = false; $('btn-sound').classList.add('off'); } } catch { /* bỏ qua */ }
   fit();
   rollPrices();
   if (data?.save && data.started) {
